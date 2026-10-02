@@ -24,7 +24,7 @@ Production environment variables:
 - `NODE_ENV=production`
 - `JWT_SECRET`: a long, unique signing secret; the Render Blueprint generates it privately when the operator creates the service
 - `INITIAL_ADMIN_EMAIL`: operator-chosen initial admin email; trimmed, lowercased and validated when the first administrator is created
-- `INITIAL_ADMIN_PASSWORD`: operator-chosen password of at least 16 characters
+- `INITIAL_ADMIN_PASSWORD`: operator-chosen password of at least 8 characters, used only to create the first administrator
 - `ALLOWED_ORIGINS`: optional explicit origin list for custom domains; on Render the app defaults to its assigned `RENDER_EXTERNAL_URL`. Without either, production does not enable cross-origin access.
 - `EXTERNAL_INTEGRATIONS_ENABLED=false`
 - `CARD_PAYMENTS_ENABLED=false`

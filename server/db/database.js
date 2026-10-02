@@ -335,7 +335,7 @@ function getDb() {
     if (userCount.c === 0 && initialAdminEmail && adminPassword) {
       // Match login and staff-account normalization; never log credential values.
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adminEmail)) throw new Error('INITIAL_ADMIN_EMAIL must be a valid email address');
-      if (!isTest && adminPassword.length < 16) throw new Error('INITIAL_ADMIN_PASSWORD must have at least 16 characters');
+      if (!isTest && adminPassword.length < 8) throw new Error('INITIAL_ADMIN_PASSWORD must have at least 8 characters');
       db.prepare('INSERT INTO usuarios (email, password_hash, nombre, rol) VALUES (?, ?, ?, ?)')
         .run(adminEmail, hashPassword(adminPassword), 'Administrador', 'admin');
       console.log('Initial administrator created (credentials are never logged).');

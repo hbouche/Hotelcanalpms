@@ -74,6 +74,35 @@ describe('First administrator production bootstrap', () => {
     expect(getDb().prepare('SELECT COUNT(*) AS c FROM usuarios').get().c).toBe(1);
   });
 
+  it('accepts exactly eight characters for the first administrator and authenticates it', async () => {
+    const eightCharacters = 'testOnly'; // Fictional fixture, never used outside this temporary database.
+    expect(eightCharacters).toHaveLength(8);
+    process.env.INITIAL_ADMIN_EMAIL = 'eight@example.invalid';
+    process.env.INITIAL_ADMIN_PASSWORD = eightCharacters;
+    const user = getDb().prepare('SELECT * FROM usuarios').get();
+    expect(user.email).toBe('eight@example.invalid');
+    expect(user.rol).toBe('admin');
+    expect((await login(user.email, eightCharacters)).status).toBe(200);
+    expect(getDb().prepare('SELECT COUNT(*) AS c FROM usuarios').get().c).toBe(1);
+    // A later bootstrap value does not reset that account, even below the minimum.
+    resetDb();
+    process.env.INITIAL_ADMIN_PASSWORD = 'fixture';
+    expect(getDb().prepare('SELECT * FROM usuarios').all()).toEqual([user]);
+    expect((await login(user.email, eightCharacters)).status).toBe(200);
+    expect((await login(user.email, 'fixture')).status).toBe(401);
+  });
+
+  it('rejects seven characters for bootstrap without creating an administrator', () => {
+    process.env.INITIAL_ADMIN_EMAIL = 'seven@example.invalid';
+    process.env.INITIAL_ADMIN_PASSWORD = 'fixture';
+    expect(process.env.INITIAL_ADMIN_PASSWORD).toHaveLength(7);
+    expect(() => getDb()).toThrow('INITIAL_ADMIN_PASSWORD must have at least 8 characters');
+    const Database = require('better-sqlite3');
+    const inspected = new Database(DB_PATH, { readonly: true });
+    try { expect(inspected.prepare('SELECT COUNT(*) AS c FROM usuarios').get().c).toBe(0); }
+    finally { inspected.close(); }
+  });
+
   it.each(['invalid-email', 'double@@example.invalid', '   ', 'person@example'])('rejects an invalid supplied bootstrap email before creating any user (%s)', email => {
     process.env.INITIAL_ADMIN_EMAIL = email;
     process.env.INITIAL_ADMIN_PASSWORD = password;
