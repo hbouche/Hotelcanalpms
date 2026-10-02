@@ -329,9 +329,12 @@ function getDb() {
     // No default production login. An operator provides initial credentials in the host's secure UI.
     const userCount = db.prepare('SELECT COUNT(*) as c FROM usuarios').get();
     const isTest = process.env.NODE_ENV === 'test';
-    const adminEmail = isTest ? 'admin@example.invalid' : process.env.INITIAL_ADMIN_EMAIL;
+    const initialAdminEmail = isTest ? 'admin@example.invalid' : process.env.INITIAL_ADMIN_EMAIL;
+    const adminEmail = (initialAdminEmail || '').trim().toLowerCase();
     const adminPassword = isTest ? 'test-only-admin-password' : process.env.INITIAL_ADMIN_PASSWORD;
-    if (userCount.c === 0 && adminEmail && adminPassword) {
+    if (userCount.c === 0 && initialAdminEmail && adminPassword) {
+      // Match login and staff-account normalization; never log credential values.
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adminEmail)) throw new Error('INITIAL_ADMIN_EMAIL must be a valid email address');
       if (!isTest && adminPassword.length < 16) throw new Error('INITIAL_ADMIN_PASSWORD must have at least 16 characters');
       db.prepare('INSERT INTO usuarios (email, password_hash, nombre, rol) VALUES (?, ?, ?, ?)')
         .run(adminEmail, hashPassword(adminPassword), 'Administrador', 'admin');

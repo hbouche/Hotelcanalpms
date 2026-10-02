@@ -34,7 +34,7 @@ export default function InteractivePopover({
   y,
   onClose,
   onAction,
-  userRole = 'admin',
+  userRole,
 }: InteractivePopoverProps) {
   const popoverRef = useRef<HTMLDivElement>(null);
   const [coords, setCoords] = useState({ left: 0, top: 0, opacity: 0 });
@@ -45,7 +45,7 @@ export default function InteractivePopover({
   const paid = reserva.monto_pagado !== undefined ? reserva.monto_pagado : (total - pending);
   const pct = total > 0 ? Math.min(100, Math.max(0, (paid / total) * 100)) : 0;
 
-  const isRestrictedRole = userRole === 'cleaning';
+  const isRestrictedRole = userRole !== 'admin' && userRole !== 'receptionist';
 
   useEffect(() => {
     if (!popoverRef.current) return;
@@ -88,6 +88,8 @@ export default function InteractivePopover({
       opacity: 1,
     });
   }, [x, y, reserva]);
+
+  if (isRestrictedRole) return null;
 
   // Color mapping based on reservation status
   const statusColors: Record<string, string> = {

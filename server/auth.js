@@ -107,20 +107,17 @@ function requireAuth(req, res, next) {
   if (!decoded) {
     return res.status(401).json({ success: false, error: { code: 'TOKEN_EXPIRED', message: 'Token inválido o expirado' } });
   }
-  // Verify user is still active in DB
-  let getDb;
-  try { getDb = require('./db/database').getDb; } catch { }
-  if (getDb) {
-    const db = getDb();
-    const userRow = db.prepare('SELECT activo FROM usuarios WHERE id = ?').get(decoded.id);
-    if (!userRow) {
-      return res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Usuario inexistente' } });
-    }
-    if (userRow.activo !== 1) {
-      return res.status(403).json({ success: false, error: { code: 'USER_DEACTIVATED', message: 'Usuario desactivado' } });
-    }
+  // Token identity is only a lookup key. Permissions and profile always come from
+  // the current database row so a role downgrade takes effect immediately.
+  const db = require('./db/database').getDb();
+  const userRow = db.prepare('SELECT id, email, nombre, rol, activo FROM usuarios WHERE id = ?').get(decoded.id);
+  if (!userRow) {
+    return res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Usuario inexistente' } });
   }
-  req.user = decoded;
+  if (userRow.activo !== 1) {
+    return res.status(403).json({ success: false, error: { code: 'USER_DEACTIVATED', message: 'Usuario desactivado' } });
+  }
+  req.user = { id: userRow.id, email: userRow.email, nombre: userRow.nombre, rol: userRow.rol };
   next();
 }
 
@@ -140,4 +137,21 @@ function requireRole(...roles) {
   };
 }
 
-module.exports = { hashPassword, verifyPassword, generateToken, decodeToken, requireAuth, requireRole, requireWrite, generateApiKey, hashApiKey };
+// Explicit staff permissions for operational and housekeeping routes. API keys
+// retain their documented scopes; a read key cannot mutate either surface.
+function requireStaffAccess(...roles) {
+  const checkRole = requireRole(...roles);
+  return (req, res, next) => {
+    if (!req.user?.isApiKey) return checkRole(req, res, next);
+    if (!['read', 'write', 'admin'].includes(req.user.permisos)) {
+      return res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'Sin permisos' } });
+    }
+    if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return requireWrite(req, res, next);
+    next();
+  };
+}
+
+const requireOperations = requireStaffAccess('admin', 'receptionist');
+const requireHousekeeping = requireStaffAccess('admin', 'receptionist', 'cleaning');
+
+module.exports = { hashPassword, verifyPassword, generateToken, decodeToken, requireAuth, requireRole, requireWrite, requireOperations, requireHousekeeping, generateApiKey, hashApiKey };

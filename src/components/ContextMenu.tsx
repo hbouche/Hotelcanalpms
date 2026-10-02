@@ -21,12 +21,12 @@ export default function ContextMenu({
   data,
   onAction,
   onClose,
-  userRole = 'admin',
+  userRole,
 }: ContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const [coords, setCoords] = useState({ left: 0, top: 0, opacity: 0 });
 
-  const isRestrictedRole = userRole === 'cleaning';
+  const isRestrictedRole = userRole !== 'admin' && userRole !== 'receptionist';
 
   useEffect(() => {
     if (!menuRef.current) return;
@@ -63,7 +63,11 @@ export default function ContextMenu({
     });
   }, [x, y]);
 
+  if (!userRole || !['admin', 'receptionist', 'cleaning'].includes(userRole)) return null;
+  if (isRestrictedRole && data.type === 'reserva') return null;
+
   const handleItemClick = (action: string) => {
+    if (isRestrictedRole && !['set_clean', 'set_dirty', 'set_inspected'].includes(action)) return;
     onAction(action, data);
     onClose();
   };
@@ -163,13 +167,13 @@ export default function ContextMenu({
             🛏️ {data.room?.nombre} • {data.date}
           </div>
 
-          <button
+          {!isRestrictedRole && <button
             onClick={() => handleItemClick('create_booking')}
             className="w-full flex items-center gap-2.5 px-2.5 py-2 text-xs font-semibold text-gray-700 hover:bg-mahana-50 hover:text-mahana-700 rounded-lg transition text-left"
           >
             <CalendarPlus size={14} className="text-mahana-600" />
             <span>Crear Nueva Reserva</span>
-          </button>
+          </button>}
 
           {/* Quick Housekeeping actions */}
           <div className="border-t border-gray-100 my-1 pt-1 space-y-0.5">

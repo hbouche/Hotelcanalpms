@@ -23,7 +23,7 @@ Use Node 22 LTS and npm. Run `npm ci --include=dev`, then `npm run build`. Set t
 Production environment variables:
 - `NODE_ENV=production`
 - `JWT_SECRET`: a long, unique signing secret; the Render Blueprint generates it privately when the operator creates the service
-- `INITIAL_ADMIN_EMAIL`: operator-chosen initial admin email
+- `INITIAL_ADMIN_EMAIL`: operator-chosen initial admin email; trimmed, lowercased and validated when the first administrator is created
 - `INITIAL_ADMIN_PASSWORD`: operator-chosen password of at least 16 characters
 - `ALLOWED_ORIGINS`: optional explicit origin list for custom domains; on Render the app defaults to its assigned `RENDER_EXTERNAL_URL`. Without either, production does not enable cross-origin access.
 - `EXTERNAL_INTEGRATIONS_ENABLED=false`
@@ -31,6 +31,16 @@ Production environment variables:
 - `DATA_DIR=/var/data/hotel-panama-canal` on the configured Render disk
 
 Initial credentials are consumed only when no users exist; changing these variables does not reset an existing user's password. Secrets must never be committed or shared in chat. If initial credentials are absent, the database has no login user. `.env.example` documents variables; environment files are not automatically loaded by this application.
+
+## Staff access
+The existing roles are enforced by the API as well as the navigation:
+- `admin`: hotel operations, guest records, payments/reports and administrator configuration, user management and protected approval actions
+- `receptionist`: reservations/check-in/check-out, guest records/documents, CRM, manual payment entries and operating reports; existing administrator-only changes remain restricted
+- `cleaning`: current occupancy and arrivals/departures counts, an anonymous room calendar, room details relevant to cleaning, do-not-disturb flags, and individual/bulk cleaning-state updates. Guest identities/contacts, reservation notes, documents, financial data, room comments/assignees, reservation changes and general room editing are not available to this role
+
+Every authenticated user request reloads the current account status, role and profile from the database. Role changes and deactivation apply to previously issued tokens on their next request. API keys keep their explicit read/write/admin scopes; read keys cannot modify operational or housekeeping data. Keys and external integrations remain disabled for normal setup until separately authorized.
+
+Public booking information remains public; housekeeping access does not grant additional private booking or guest information. Select each person's actual role before creating their account. There are no pre-created hotel staff accounts.
 
 ## Render persistent deployment
 `render.yaml` defines the approved scope: one Starter Node Web Service, one 1 GB persistent disk mounted at `/var/data`, and `DATA_DIR=/var/data/hotel-panama-canal`. Automatic service deployments are off; also disable automatic Blueprint synchronization in the Dashboard. The base price is USD 7.25/month plus applicable taxes and approved workspace bandwidth overages. Confirm actual checkout details before activation. The operator enters the initial admin email and password in Render and submits the Blueprint, which also creates the private signing secret. This file does not deploy or purchase anything by itself.

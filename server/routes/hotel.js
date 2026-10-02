@@ -3,7 +3,8 @@ const router = express.Router();
 const path = require('path');
 const fs = require('fs');
 const { getDb, findById, create, update } = require('../db/database');
-const { requireAuth, requireRole } = require('../auth');
+const { requireAuth, requireRole, requireOperations, requireHousekeeping } = require('../auth');
+const { housekeepingRoom } = require('../housekeeping');
 const { calcNoches, calcReservation, calcReservationWithRates, getConfig } = require('../utils/calculations');
 const { fireWebhooks } = require('../utils/webhooks');
 const { upload, validateUploadSignature, UPLOADS_DIR } = require('../utils/upload');
@@ -34,7 +35,7 @@ function sanitize(str) {
 // PLANES DE TARIFA
 // ══════════════════════════════════════
 
-router.get('/hotel/planes', requireAuth, (req, res) => {
+router.get('/hotel/planes', requireAuth, requireOperations, (req, res) => {
   try {
     const db = getDb();
     const showAll = req.query.all === '1'; // include inactive
@@ -50,7 +51,7 @@ router.get('/hotel/planes', requireAuth, (req, res) => {
   } catch (e) { console.error(e); err(res, 'SERVER_ERROR', 'Error listando planes', 500); }
 });
 
-router.get('/hotel/productos/:id', requireAuth, (req, res) => {
+router.get('/hotel/productos/:id', requireAuth, requireOperations, (req, res) => {
   try {
     const p = findById('planes_tarifa', req.params.id);
     if (!p) return err(res, 'NOT_FOUND', 'Producto no encontrado', 404);
@@ -58,7 +59,7 @@ router.get('/hotel/productos/:id', requireAuth, (req, res) => {
   } catch (e) { err(res, 'SERVER_ERROR', 'Error obteniendo producto', 500); }
 });
 
-router.post('/hotel/planes', requireAuth, requireRole('admin'), (req, res) => {
+router.post('/hotel/planes', requireAuth, requireOperations, requireRole('admin'), (req, res) => {
   try {
     const { codigo, nombre, precio_adulto_noche } = req.body;
     if (!codigo || !nombre || precio_adulto_noche === undefined) return err(res, 'VALIDATION_ERROR', 'codigo, nombre y precio_adulto_noche requeridos');
@@ -84,7 +85,7 @@ router.post('/hotel/planes', requireAuth, requireRole('admin'), (req, res) => {
   } catch (e) { console.error(e); err(res, 'SERVER_ERROR', 'Error creando producto', 500); }
 });
 
-router.put('/hotel/planes/:id', requireAuth, requireRole('admin'), (req, res) => {
+router.put('/hotel/planes/:id', requireAuth, requireOperations, requireRole('admin'), (req, res) => {
   try {
     const existing = findById('planes_tarifa', req.params.id);
     if (!existing) return err(res, 'NOT_FOUND', 'Producto no encontrado', 404);
@@ -118,7 +119,7 @@ router.put('/hotel/planes/:id', requireAuth, requireRole('admin'), (req, res) =>
   } catch (e) { console.error(e); err(res, 'SERVER_ERROR', 'Error actualizando producto', 500); }
 });
 
-router.delete('/hotel/planes/:id', requireAuth, requireRole('admin'), (req, res) => {
+router.delete('/hotel/planes/:id', requireAuth, requireOperations, requireRole('admin'), (req, res) => {
   try {
     const existing = findById('planes_tarifa', req.params.id);
     if (!existing) return err(res, 'NOT_FOUND', 'Producto no encontrado', 404);
@@ -128,7 +129,7 @@ router.delete('/hotel/planes/:id', requireAuth, requireRole('admin'), (req, res)
 });
 
 // Upload product photo
-router.post('/hotel/planes/:id/foto', requireAuth, requireRole('admin'), upload.single('foto'), (req, res) => {
+router.post('/hotel/planes/:id/foto', requireAuth, requireOperations, requireRole('admin'), upload.single('foto'), (req, res) => {
   try {
     if (!req.file) return err(res, 'VALIDATION_ERROR', 'Archivo de imagen requerido');
     const existing = findById('planes_tarifa', req.params.id);
@@ -140,7 +141,7 @@ router.post('/hotel/planes/:id/foto', requireAuth, requireRole('admin'), upload.
 });
 
 // Cotizar — preview pricing with day-based rates
-router.get('/hotel/cotizar', requireAuth, (req, res) => {
+router.get('/hotel/cotizar', requireAuth, requireOperations, (req, res) => {
   try {
     const { plan, adultos = 1, menores = 0, mascotas = 0, check_in, check_out } = req.query;
     if (!plan || !check_in || !check_out) return err(res, 'VALIDATION_ERROR', 'plan, check_in, check_out requeridos');
@@ -161,7 +162,7 @@ router.get('/hotel/cotizar', requireAuth, (req, res) => {
 // REGLAS DE TARIFA
 // ══════════════════════════════════════
 
-router.get('/hotel/planes/:id/reglas', requireAuth, (req, res) => {
+router.get('/hotel/planes/:id/reglas', requireAuth, requireOperations, (req, res) => {
   try {
     const db = getDb();
     const reglas = db.prepare("SELECT * FROM reglas_tarifa WHERE plan_id = ? ORDER BY CASE tipo_dia WHEN 'entre_semana' THEN 1 WHEN 'fin_de_semana' THEN 2 WHEN 'festivo' THEN 3 END").all(req.params.id);
@@ -169,7 +170,7 @@ router.get('/hotel/planes/:id/reglas', requireAuth, (req, res) => {
   } catch (e) { console.error('Reglas error:', e); err(res, 'SERVER_ERROR', 'Error listando reglas', 500); }
 });
 
-router.put('/hotel/planes/:id/reglas', requireAuth, requireRole('admin'), (req, res) => {
+router.put('/hotel/planes/:id/reglas', requireAuth, requireOperations, requireRole('admin'), (req, res) => {
   try {
     const planId = req.params.id;
     const existing = findById('planes_tarifa', planId);
@@ -197,14 +198,14 @@ router.put('/hotel/planes/:id/reglas', requireAuth, requireRole('admin'), (req, 
 // DÍAS FESTIVOS
 // ══════════════════════════════════════
 
-router.get('/hotel/festivos', requireAuth, (req, res) => {
+router.get('/hotel/festivos', requireAuth, requireOperations, (req, res) => {
   try {
     const db = getDb();
     ok(res, db.prepare('SELECT * FROM dias_festivos ORDER BY fecha').all());
   } catch (e) { err(res, 'SERVER_ERROR', 'Error listando festivos', 500); }
 });
 
-router.post('/hotel/festivos', requireAuth, requireRole('admin'), (req, res) => {
+router.post('/hotel/festivos', requireAuth, requireOperations, requireRole('admin'), (req, res) => {
   try {
     const { fecha, nombre } = req.body;
     if (!fecha || !nombre) return err(res, 'VALIDATION_ERROR', 'fecha y nombre requeridos');
@@ -216,7 +217,7 @@ router.post('/hotel/festivos', requireAuth, requireRole('admin'), (req, res) => 
   } catch (e) { err(res, 'SERVER_ERROR', 'Error creando festivo', 500); }
 });
 
-router.delete('/hotel/festivos/:id', requireAuth, requireRole('admin'), (req, res) => {
+router.delete('/hotel/festivos/:id', requireAuth, requireOperations, requireRole('admin'), (req, res) => {
   try {
     const db = getDb();
     db.prepare('DELETE FROM dias_festivos WHERE id = ?').run(req.params.id);
@@ -228,7 +229,7 @@ router.delete('/hotel/festivos/:id', requireAuth, requireRole('admin'), (req, re
 // DISPONIBILIDAD
 // ══════════════════════════════════════
 
-router.get('/hotel/disponibilidad', requireAuth, (req, res) => {
+router.get('/hotel/disponibilidad', requireAuth, requireOperations, (req, res) => {
   try {
     const { check_in, check_out } = req.query;
     if (!check_in || !check_out) return err(res, 'VALIDATION_ERROR', 'check_in y check_out requeridos');
@@ -250,7 +251,7 @@ router.get('/hotel/disponibilidad', requireAuth, (req, res) => {
 });
 
 // Calendar grid data
-router.get('/hotel/calendario', requireAuth, (req, res) => {
+router.get('/hotel/calendario', requireAuth, requireHousekeeping, (req, res) => {
   try {
     const { desde, hasta } = req.query;
     if (!desde || !hasta) return err(res, 'VALIDATION_ERROR', 'desde y hasta requeridos');
@@ -261,9 +262,20 @@ router.get('/hotel/calendario', requireAuth, (req, res) => {
       FROM reservas_hotel r
       LEFT JOIN habitaciones h ON r.habitacion_id = h.id
       WHERE r.estado NOT IN ('Cancelada', 'No-Show')
-        AND r.check_in < ? AND r.check_out > ?
+        AND r.check_in < ? AND r.check_out ${req.user?.rol === 'cleaning' ? '>=' : '>'} ?
       ORDER BY r.check_in
     `).all(hasta, desde);
+    if (req.user?.rol === 'cleaning') {
+      return ok(res, {
+        housekeeping: true,
+        habitaciones: rooms.map(housekeepingRoom),
+        // Deliberate allowlist: no guest names, contact info, notes, documents,
+        // group identifiers, headcounts or financial fields in this view.
+        reservas: reservations.map(({ id, habitacion_id, check_in, check_out, estado, habitacion_nombre, habitacion_tipo }) => ({
+          id, habitacion_id, check_in, check_out, estado, habitacion_nombre, habitacion_tipo,
+        })),
+      });
+    }
     ok(res, { habitaciones: rooms, reservas: reservations });
   } catch (e) { err(res, 'SERVER_ERROR', 'Error cargando calendario', 500); }
 });
@@ -272,7 +284,7 @@ router.get('/hotel/calendario', requireAuth, (req, res) => {
 // RESERVAS DE HOTEL
 // ══════════════════════════════════════
 
-router.get('/hotel/reservas', requireAuth, (req, res) => {
+router.get('/hotel/reservas', requireAuth, requireOperations, (req, res) => {
   try {
     const { estado, tipo_habitacion, cliente, check_in_desde, check_in_hasta, grupo_codigo, page = 1, limit = 50 } = req.query;
     const db = getDb();
@@ -310,7 +322,7 @@ router.get('/hotel/reservas', requireAuth, (req, res) => {
   } catch (e) { console.error(e); err(res, 'SERVER_ERROR', 'Error listando reservas', 500); }
 });
 
-router.get('/hotel/reservas/:id', requireAuth, (req, res) => {
+router.get('/hotel/reservas/:id', requireAuth, requireOperations, (req, res) => {
   try {
     const reserva = findById('reservas_hotel', req.params.id);
     if (!reserva) return err(res, 'NOT_FOUND', 'Reserva no encontrada', 404);
@@ -330,7 +342,7 @@ router.get('/hotel/reservas/:id', requireAuth, (req, res) => {
   } catch (e) { err(res, 'SERVER_ERROR', 'Error obteniendo reserva', 500); }
 });
 
-router.post('/hotel/reservas/grupo', requireAuth, (req, res) => {
+router.post('/hotel/reservas/grupo', requireAuth, requireOperations, (req, res) => {
   try {
     const { reservas, facturacion_consolidada = 1 } = req.body;
     if (!Array.isArray(reservas) || reservas.length === 0) {
@@ -645,7 +657,7 @@ router.post('/hotel/reservas/grupo', requireAuth, (req, res) => {
   }
 });
 
-router.post('/hotel/reservas', requireAuth, (req, res) => {
+router.post('/hotel/reservas', requireAuth, requireOperations, (req, res) => {
   try {
     const { cliente, check_in, check_out, habitacion_id } = req.body;
     const missing = [];
@@ -803,7 +815,7 @@ router.post('/hotel/reservas', requireAuth, (req, res) => {
   } catch (e) { console.error('Error creating reserva:', e); err(res, 'SERVER_ERROR', 'Error creando reserva', 500); }
 });
 
-router.put('/hotel/reservas/:id', requireAuth, (req, res) => {
+router.put('/hotel/reservas/:id', requireAuth, requireOperations, (req, res) => {
   try {
     const existing = findById('reservas_hotel', req.params.id);
     if (!existing) return err(res, 'NOT_FOUND', 'Reserva no encontrada', 404);
@@ -856,7 +868,7 @@ router.put('/hotel/reservas/:id', requireAuth, (req, res) => {
   } catch (e) { console.error(e); err(res, 'SERVER_ERROR', 'Error actualizando reserva', 500); }
 });
 
-router.post('/hotel/reservas/:id/solicitar-cambio', requireAuth, (req, res) => {
+router.post('/hotel/reservas/:id/solicitar-cambio', requireAuth, requireOperations, (req, res) => {
   try {
     const { tipo_modificacion, transaccion_original_id, justificacion, snapshot_datos } = req.body;
     if (!tipo_modificacion || !justificacion || !snapshot_datos) {
@@ -911,7 +923,7 @@ router.post('/hotel/reservas/:id/solicitar-cambio', requireAuth, (req, res) => {
 });
 
 // Status change (Check-in / Check-out)
-router.patch('/hotel/reservas/:id/status', requireAuth, requireRole('admin', 'receptionist'), (req, res) => {
+router.patch('/hotel/reservas/:id/status', requireAuth, requireOperations, requireRole('admin', 'receptionist'), (req, res) => {
   try {
     const { estado } = req.body;
     const valid = ['Pendiente', 'Confirmada', 'Hospedado', 'Check-Out', 'Cancelada', 'No-Show'];
@@ -966,7 +978,7 @@ router.patch('/hotel/reservas/:id/status', requireAuth, requireRole('admin', 're
 });
 
 // Delete a reservation completely with audit log (Admin only)
-router.delete('/hotel/reservas/:id', requireAuth, requireRole('admin'), (req, res) => {
+router.delete('/hotel/reservas/:id', requireAuth, requireOperations, requireRole('admin'), (req, res) => {
   try {
     const db = getDb();
     const reserva = findById('reservas_hotel', req.params.id);
@@ -1014,7 +1026,7 @@ router.delete('/hotel/reservas/:id', requireAuth, requireRole('admin'), (req, re
 // FOLIO / PAGOS
 // ══════════════════════════════════════
 
-router.get('/hotel/reservas/:id/folio', requireAuth, (req, res) => {
+router.get('/hotel/reservas/:id/folio', requireAuth, requireOperations, (req, res) => {
   try {
     const db = getDb();
     const entries = db.prepare('SELECT * FROM folio_hotel WHERE reserva_id = ? ORDER BY created_at').all(req.params.id);
@@ -1023,7 +1035,7 @@ router.get('/hotel/reservas/:id/folio', requireAuth, (req, res) => {
 });
 
 // Register payment (crédito) or extra charge (débito)
-router.post('/hotel/reservas/:id/folio', requireAuth, (req, res) => {
+router.post('/hotel/reservas/:id/folio', requireAuth, requireOperations, (req, res) => {
   try {
     const reserva = findById('reservas_hotel', req.params.id);
     if (!reserva) return err(res, 'NOT_FOUND', 'Reserva no encontrada', 404);
@@ -1092,7 +1104,7 @@ router.post('/hotel/reservas/:id/folio', requireAuth, (req, res) => {
 });
 
 // Edit a movement in the folio directly (Admin only)
-router.put('/hotel/reservas/:id/folio/:folioId', requireAuth, requireRole('admin'), (req, res) => {
+router.put('/hotel/reservas/:id/folio/:folioId', requireAuth, requireOperations, requireRole('admin'), (req, res) => {
   try {
     const db = getDb();
     const reserva = findById('reservas_hotel', req.params.id);
@@ -1163,7 +1175,7 @@ router.put('/hotel/reservas/:id/folio/:folioId', requireAuth, requireRole('admin
 });
 
 // Delete a movement in the folio directly (Admin only)
-router.delete('/hotel/reservas/:id/folio/:folioId', requireAuth, requireRole('admin'), (req, res) => {
+router.delete('/hotel/reservas/:id/folio/:folioId', requireAuth, requireOperations, requireRole('admin'), (req, res) => {
   try {
     const db = getDb();
     const reserva = findById('reservas_hotel', req.params.id);
@@ -1217,7 +1229,7 @@ router.delete('/hotel/reservas/:id/folio/:folioId', requireAuth, requireRole('ad
 });
 
 // Reversar un movimiento de folio (crédito o débito)
-router.post('/hotel/reservas/:id/folio/:folioId/reversar', requireAuth, requireRole('admin'), (req, res) => {
+router.post('/hotel/reservas/:id/folio/:folioId/reversar', requireAuth, requireOperations, requireRole('admin'), (req, res) => {
   try {
     const db = getDb();
     const reserva = findById('reservas_hotel', req.params.id);
@@ -1278,7 +1290,7 @@ router.post('/hotel/reservas/:id/folio/:folioId/reversar', requireAuth, requireR
 });
 
 // Saldos pendientes
-router.get('/hotel/saldos', requireAuth, (req, res) => {
+router.get('/hotel/saldos', requireAuth, requireOperations, (req, res) => {
   try {
     const db = getDb();
     const pending = db.prepare(`
@@ -1293,7 +1305,7 @@ router.get('/hotel/saldos', requireAuth, (req, res) => {
 });
 
 // Cuentas por Cobrar de Terceros y Cuponeras (Oferta Simple, PaHoy, Al Cobro)
-router.get('/hotel/saldos/terceros', requireAuth, (req, res) => {
+router.get('/hotel/saldos/terceros', requireAuth, requireOperations, (req, res) => {
   try {
     const db = getDb();
     const entries = db.prepare(`
@@ -1315,7 +1327,7 @@ router.get('/hotel/saldos/terceros', requireAuth, (req, res) => {
 });
 
 // Reconciliación en lote de CxC Terceros y Cuponeras
-router.post('/hotel/saldos/reconciliar', requireAuth, requireRole('admin'), (req, res) => {
+router.post('/hotel/saldos/reconciliar', requireAuth, requireOperations, requireRole('admin'), (req, res) => {
   try {
     const { ids, comision_porcentaje } = req.body;
     if (!Array.isArray(ids) || ids.length === 0) {
@@ -1347,7 +1359,7 @@ router.post('/hotel/saldos/reconciliar', requireAuth, requireRole('admin'), (req
 // ══════════════════════════════════════
 
 // List guests
-router.get('/hotel/huespedes', requireAuth, (req, res) => {
+router.get('/hotel/huespedes', requireAuth, requireOperations, (req, res) => {
   try {
     const { q, page = 1, limit = 50, habitual } = req.query;
     const db = getDb();
@@ -1364,7 +1376,7 @@ router.get('/hotel/huespedes', requireAuth, (req, res) => {
 });
 
 // Search guests (autocomplete)
-router.get('/hotel/huespedes/buscar', requireAuth, (req, res) => {
+router.get('/hotel/huespedes/buscar', requireAuth, requireOperations, (req, res) => {
   try {
     const { q } = req.query;
     if (!q || q.length < 2) return ok(res, []);
@@ -1375,7 +1387,7 @@ router.get('/hotel/huespedes/buscar', requireAuth, (req, res) => {
 });
 
 // Guest aggregate stats
-router.get('/hotel/huespedes/stats', requireAuth, (req, res) => {
+router.get('/hotel/huespedes/stats', requireAuth, requireOperations, (req, res) => {
   try {
     const db = getDb();
     const totals = db.prepare(`
@@ -1425,7 +1437,7 @@ router.get('/hotel/huespedes/stats', requireAuth, (req, res) => {
 // DASHBOARD
 // ══════════════════════════════════════
 
-router.get('/hotel/dashboard', requireAuth, (req, res) => {
+router.get('/hotel/dashboard', requireAuth, requireHousekeeping, (req, res) => {
   try {
     const db = getDb();
     const hoy = new Date().toISOString().split('T')[0];
@@ -1449,6 +1461,21 @@ router.get('/hotel/dashboard', requireAuth, (req, res) => {
     const llegadasHoy = db.prepare(`SELECT COUNT(*) as c FROM reservas_hotel WHERE check_in = ? AND estado NOT IN ('Cancelada', 'No-Show')`).get(hoy).c;
     const salidasHoy = db.prepare(`SELECT COUNT(*) as c FROM reservas_hotel WHERE check_out = ? AND estado NOT IN ('Cancelada', 'No-Show')`).get(hoy).c;
     const hospedados = db.prepare(`SELECT COUNT(*) as c FROM reservas_hotel WHERE estado = 'Hospedado'`).get().c;
+
+    if (req.user?.rol === 'cleaning') {
+      const cleaningStats = (category) => db.prepare(`
+        SELECT estado_limpieza, COUNT(*) as c FROM habitaciones
+        WHERE activa = 1 ${category ? 'AND categoria = ?' : ''} GROUP BY estado_limpieza
+      `).all(...(category ? [category] : []));
+      return ok(res, {
+        housekeeping: true,
+        ocupacion: { total: totalRooms, ocupadas: occupied, porcentaje: totalRooms > 0 ? Math.round(occupied / totalRooms * 100) : 0 },
+        hoy: { llegadas: llegadasHoy, salidas: salidasHoy, hospedados },
+        limpieza: cleaningStats(),
+        limpieza_estadia: cleaningStats('Estadía'),
+        limpieza_pasadia: cleaningStats('Pasadía'),
+      });
+    }
 
     const saldoTotal = db.prepare(`
       SELECT COALESCE(SUM(saldo_pendiente), 0) as total FROM reservas_hotel
@@ -1610,7 +1637,7 @@ router.get('/hotel/dashboard', requireAuth, (req, res) => {
 // ══════════════════════════════════════
 
 // Upload document
-router.post('/hotel/reservas/:id/documentos', requireAuth, upload.single('archivo'), validateUploadSignature, (req, res) => {
+router.post('/hotel/reservas/:id/documentos', requireAuth, requireOperations, upload.single('archivo'), validateUploadSignature, (req, res) => {
   try {
     if (!req.file) return err(res, 'VALIDATION_ERROR', 'Archivo requerido (JPEG, PNG, WebP, PDF, máx 10MB)');
     const reserva = findById('reservas_hotel', req.params.id);
@@ -1628,7 +1655,7 @@ router.post('/hotel/reservas/:id/documentos', requireAuth, upload.single('archiv
 });
 
 // List documents
-router.get('/hotel/reservas/:id/documentos', requireAuth, (req, res) => {
+router.get('/hotel/reservas/:id/documentos', requireAuth, requireOperations, (req, res) => {
   try {
     const db = getDb();
     const docs = db.prepare('SELECT * FROM documentos_reserva WHERE reserva_id = ? ORDER BY created_at DESC').all(req.params.id);
@@ -1637,7 +1664,7 @@ router.get('/hotel/reservas/:id/documentos', requireAuth, (req, res) => {
 });
 
 // Guest documents require the standard active-user authentication check.
-router.get('/hotel/documentos/:docId/archivo', requireAuth, (req, res) => {
+router.get('/hotel/documentos/:docId/archivo', requireAuth, requireOperations, (req, res) => {
   try {
     const db = getDb();
     const doc = db.prepare('SELECT * FROM documentos_reserva WHERE id = ?').get(req.params.docId);
@@ -1651,7 +1678,7 @@ router.get('/hotel/documentos/:docId/archivo', requireAuth, (req, res) => {
 });
 
 // Delete document
-router.delete('/hotel/documentos/:docId', requireAuth, requireRole('admin'), (req, res) => {
+router.delete('/hotel/documentos/:docId', requireAuth, requireOperations, requireRole('admin'), (req, res) => {
   try {
     const db = getDb();
     const doc = db.prepare('SELECT * FROM documentos_reserva WHERE id = ?').get(req.params.docId);
@@ -1668,7 +1695,7 @@ router.delete('/hotel/documentos/:docId', requireAuth, requireRole('admin'), (re
 // CONFIG
 // ══════════════════════════════════════
 
-router.get('/hotel/config', requireAuth, (req, res) => {
+router.get('/hotel/config', requireAuth, requireOperations, (req, res) => {
   try {
     const db = getDb();
     const config = db.prepare('SELECT * FROM config_hotel').all();
@@ -1682,7 +1709,7 @@ router.get('/hotel/config', requireAuth, (req, res) => {
 // FINANCIAL REPORTS
 // ══════════════════════════════════════
 
-router.get('/reportes/financiero', requireAuth, (req, res) => {
+router.get('/reportes/financiero', requireAuth, requireOperations, (req, res) => {
   try {
     const db = getDb();
     const { desde, hasta } = req.query;
@@ -1788,7 +1815,7 @@ router.get('/reportes/financiero', requireAuth, (req, res) => {
 // ── NOTIFICACIONES DE RESERVAS Y REENVÍO ──
 
 // Listar notificaciones de una reserva
-router.get('/hotel/reservas/:id/notificaciones', requireAuth, (req, res) => {
+router.get('/hotel/reservas/:id/notificaciones', requireAuth, requireOperations, (req, res) => {
   try {
     const db = getDb();
     const reserva = findById('reservas_hotel', req.params.id);
@@ -1804,7 +1831,7 @@ router.get('/hotel/reservas/:id/notificaciones', requireAuth, (req, res) => {
 });
 
 // Reenviar notificación por ID
-router.post('/hotel/notificaciones/:logId/reenviar', requireAuth, async (req, res) => {
+router.post('/hotel/notificaciones/:logId/reenviar', requireAuth, requireOperations, async (req, res) => {
   try {
     const db = getDb();
     const log = db.prepare('SELECT * FROM notificaciones_log WHERE id = ?').get(req.params.logId);

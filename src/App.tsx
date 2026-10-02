@@ -47,7 +47,7 @@ function App() {
 
   // Fetch pending count periodically
   useEffect(() => {
-    if (user && user.rol !== 'cleaning') {
+    if (user && ['admin', 'receptionist'].includes(user.rol)) {
       const fetchPending = () => {
         api.get('/hotel/reservas?estado=Pendiente')
           .then(r => {
@@ -83,7 +83,11 @@ function App() {
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-gray-50"><div className="animate-pulse text-xl text-gray-400">Cargando...</div></div>;
   if (!user) return <Login onLogin={handleLogin} />;
 
-  const isCleaning = user?.rol === 'cleaning';
+  if (!['admin', 'receptionist', 'cleaning'].includes(user.rol)) {
+    return <div className="p-8 text-gray-600" role="alert">No se pudo verificar el rol de esta cuenta. <button onClick={handleLogout} className="underline">Cerrar sesión</button></div>;
+  }
+
+  const isCleaning = user.rol === 'cleaning';
   const isAdmin = user?.rol === 'admin';
 
   const fullNav = [
@@ -164,13 +168,13 @@ function App() {
               </div>
             )}
             {/* Vista Cliente separator + link */}
-            <div className="border-t border-gray-100 mt-3 pt-3">
+            {!isCleaning && <div className="border-t border-gray-100 mt-3 pt-3">
               <a href="/reservar" target="_blank" rel="noopener"
                 className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 transition border border-amber-200">
                 <ExternalLink size={18} />
                 Vista Cliente
               </a>
-            </div>
+            </div>}
           </nav>
         </aside>
 
@@ -180,9 +184,9 @@ function App() {
         {/* Main Content */}
         <main className="flex-1 p-4 lg:p-6 min-h-[calc(100vh-3.5rem)]">
           <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/calendario" element={<Calendario />} />
-            <Route path="/habitaciones" element={<Habitaciones />} />
+            <Route path="/" element={<Dashboard userRole={user.rol} />} />
+            <Route path="/calendario" element={<Calendario userRole={user.rol} />} />
+            <Route path="/habitaciones" element={<Habitaciones userRole={user.rol} />} />
 
             {!isCleaning && (
               <>

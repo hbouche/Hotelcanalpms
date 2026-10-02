@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { getDb } = require('../db/database');
-const { requireAuth } = require('../auth');
+const { requireAuth, requireOperations } = require('../auth');
 
 function ok(res, data, status = 200) {
   return res.status(status).json({ success: true, data });
@@ -12,7 +12,7 @@ function err(res, message, status = 400) {
 }
 
 // ── GET /api/v1/crm/servicios ──
-router.get('/servicios', requireAuth, (req, res) => {
+router.get('/servicios', requireAuth, requireOperations, (req, res) => {
   try {
     const db = getDb();
     const { include_inactive } = req.query || {};
@@ -30,7 +30,7 @@ router.get('/servicios', requireAuth, (req, res) => {
 });
 
 // ── POST /api/v1/crm/servicios ──
-router.post('/servicios', requireAuth, (req, res) => {
+router.post('/servicios', requireAuth, requireOperations, (req, res) => {
   try {
     const { nombre, descripcion, precio_base, tipo_precio, activo } = req.body;
     if (!nombre || precio_base === undefined) return err(res, 'Nombre y precio base requeridos');
@@ -52,7 +52,7 @@ router.post('/servicios', requireAuth, (req, res) => {
 });
 
 // ── PUT /api/v1/crm/servicios/:id ──
-router.put('/servicios/:id', requireAuth, (req, res) => {
+router.put('/servicios/:id', requireAuth, requireOperations, (req, res) => {
   try {
     const { nombre, descripcion, precio_base, tipo_precio, activo } = req.body;
     if (!nombre || precio_base === undefined) return err(res, 'Nombre y precio base requeridos');
@@ -73,7 +73,7 @@ router.put('/servicios/:id', requireAuth, (req, res) => {
 });
 
 // ── DELETE /api/v1/crm/servicios/:id ──
-router.delete('/servicios/:id', requireAuth, (req, res) => {
+router.delete('/servicios/:id', requireAuth, requireOperations, (req, res) => {
   try {
     const db = getDb();
     // Soft delete / deactivate service so historical quotes don't break
@@ -93,7 +93,7 @@ router.delete('/servicios/:id', requireAuth, (req, res) => {
 
 
 // ── GET /api/v1/crm/leads ──
-router.get('/leads', requireAuth, (req, res) => {
+router.get('/leads', requireAuth, requireOperations, (req, res) => {
   try {
     const db = getDb();
     const leads = db.prepare(`
@@ -115,7 +115,7 @@ router.get('/leads', requireAuth, (req, res) => {
 });
 
 // ── GET /api/v1/crm/leads/:id ──
-router.get('/leads/:id', requireAuth, (req, res) => {
+router.get('/leads/:id', requireAuth, requireOperations, (req, res) => {
   try {
     const db = getDb();
     const lead = db.prepare('SELECT * FROM leads_clientes WHERE id = ?').get(req.params.id);
@@ -143,7 +143,7 @@ router.get('/leads/:id', requireAuth, (req, res) => {
 });
 
 // ── POST /api/v1/crm/leads ──
-router.post('/leads', requireAuth, (req, res) => {
+router.post('/leads', requireAuth, requireOperations, (req, res) => {
   try {
     const { nombre, apellido, email, telefono, notas, estado, fecha_seguimiento, oferta_mejora } = req.body;
     if (!nombre) return err(res, 'El nombre es obligatorio');
@@ -175,7 +175,7 @@ router.post('/leads', requireAuth, (req, res) => {
 });
 
 // ── PUT /api/v1/crm/leads/:id ──
-router.put('/leads/:id', requireAuth, (req, res) => {
+router.put('/leads/:id', requireAuth, requireOperations, (req, res) => {
   try {
     const { nombre, apellido, email, telefono, notas, estado, atendido, fecha_seguimiento, oferta_mejora } = req.body;
     if (!nombre) return err(res, 'El nombre es obligatorio');
@@ -210,7 +210,7 @@ router.put('/leads/:id', requireAuth, (req, res) => {
 });
 
 // ── DELETE /api/v1/crm/leads/:id ──
-router.delete('/leads/:id', requireAuth, (req, res) => {
+router.delete('/leads/:id', requireAuth, requireOperations, (req, res) => {
   try {
     const db = getDb();
     const result = db.prepare('DELETE FROM leads_clientes WHERE id = ?').run(req.params.id);
@@ -223,7 +223,7 @@ router.delete('/leads/:id', requireAuth, (req, res) => {
 });
 
 // ── PATCH /api/v1/crm/leads/:id/status ──
-router.patch('/leads/:id/status', requireAuth, (req, res) => {
+router.patch('/leads/:id/status', requireAuth, requireOperations, (req, res) => {
   try {
     const { estado } = req.body;
     const validStatuses = ['Borrador', 'Enviada', 'En Negociación', 'Aceptada', 'Rechazada'];
@@ -250,7 +250,7 @@ router.patch('/leads/:id/status', requireAuth, (req, res) => {
 });
 
 // ── POST /api/v1/crm/leads/:id/cotizaciones ──
-router.post('/leads/:id/cotizaciones', requireAuth, (req, res) => {
+router.post('/leads/:id/cotizaciones', requireAuth, requireOperations, (req, res) => {
   try {
     const leadId = req.params.id;
     const db = getDb();

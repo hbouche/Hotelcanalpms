@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const { getDb, findById, create, update } = require('../db/database');
-const { requireAuth, requireRole } = require('../auth');
+const { requireAuth, requireRole, requireOperations, requireHousekeeping } = require('../auth');
+const { housekeepingRoom } = require('../housekeeping');
 const { upload, validateUploadSignature } = require('../utils/upload');
 
 function ok(res, data, meta, status = 200) {
@@ -20,16 +21,16 @@ function sanitize(str) {
 }
 
 // Get active rooms
-router.get('/', requireAuth, (req, res) => {
+router.get('/', requireAuth, requireHousekeeping, (req, res) => {
   try {
     const db = getDb();
     const rooms = db.prepare('SELECT * FROM habitaciones WHERE activa = 1 ORDER BY tipo, id').all();
-    ok(res, rooms);
+    ok(res, req.user?.rol === 'cleaning' ? rooms.map(housekeepingRoom) : rooms);
   } catch (e) { err(res, 'SERVER_ERROR', 'Error listando habitaciones', 500); }
 });
 
 // All rooms (including inactive) — for admin
-router.get('/todas', requireAuth, (req, res) => {
+router.get('/todas', requireAuth, requireOperations, (req, res) => {
   try {
     const db = getDb();
     const rooms = db.prepare('SELECT * FROM habitaciones ORDER BY tipo, id').all();
@@ -38,7 +39,7 @@ router.get('/todas', requireAuth, (req, res) => {
 });
 
 // Distinct room types — for dropdowns
-router.get('/tipos', requireAuth, (req, res) => {
+router.get('/tipos', requireAuth, requireHousekeeping, (req, res) => {
   try {
     const db = getDb();
     const tipos = db.prepare('SELECT DISTINCT tipo FROM habitaciones WHERE activa = 1 ORDER BY tipo').all().map(r => r.tipo);
@@ -47,7 +48,7 @@ router.get('/tipos', requireAuth, (req, res) => {
 });
 
 // Create room
-router.post('/', requireAuth, requireRole('admin'), (req, res) => {
+router.post('/', requireAuth, requireOperations, requireRole('admin'), (req, res) => {
   try {
     const { nombre, tipo } = req.body;
     if (!nombre || !tipo) return err(res, 'VALIDATION_ERROR', 'nombre y tipo requeridos');
@@ -70,7 +71,7 @@ router.post('/', requireAuth, requireRole('admin'), (req, res) => {
 });
 
 // Update room (full edit)
-router.put('/:id', requireAuth, requireRole('admin'), (req, res) => {
+router.put('/:id', requireAuth, requireOperations, requireRole('admin'), (req, res) => {
   try {
     const existing = findById('habitaciones', req.params.id);
     if (!existing) return err(res, 'NOT_FOUND', 'Habitación no encontrada', 404);
@@ -87,7 +88,7 @@ router.put('/:id', requireAuth, requireRole('admin'), (req, res) => {
 });
 
 // Delete room (soft-delete)
-router.delete('/:id', requireAuth, requireRole('admin'), (req, res) => {
+router.delete('/:id', requireAuth, requireOperations, requireRole('admin'), (req, res) => {
   try {
     const existing = findById('habitaciones', req.params.id);
     if (!existing) return err(res, 'NOT_FOUND', 'Habitación no encontrada', 404);
@@ -101,18 +102,18 @@ router.delete('/:id', requireAuth, requireRole('admin'), (req, res) => {
 });
 
 // Update limpieza
-router.patch('/:id/limpieza', requireAuth, (req, res) => {
+router.patch('/:id/limpieza', requireAuth, requireHousekeeping, (req, res) => {
   try {
     const { estado_limpieza } = req.body;
     const valid = ['Sucia', 'Limpia', 'Inspeccionada'];
     if (!valid.includes(estado_limpieza)) return err(res, 'VALIDATION_ERROR', `Estados válidos: ${valid.join(', ')}`);
     const updated = update('habitaciones', req.params.id, { estado_limpieza });
-    ok(res, updated);
+    ok(res, req.user?.rol === 'cleaning' ? housekeepingRoom(updated) : updated);
   } catch (e) { err(res, 'SERVER_ERROR', 'Error actualizando limpieza', 500); }
 });
 
 // Bulk update limpieza
-router.patch('/masiva', requireAuth, (req, res) => {
+router.patch('/masiva', requireAuth, requireHousekeeping, (req, res) => {
   try {
     const { ids, estado_limpieza } = req.body;
     const valid = ['Sucia', 'Limpia', 'Inspeccionada'];
@@ -127,7 +128,7 @@ router.patch('/masiva', requireAuth, (req, res) => {
 });
 
 // Room patch (other fields)
-router.patch('/:id', requireAuth, (req, res) => {
+router.patch('/:id', requireAuth, requireOperations, (req, res) => {
   try {
     const data = {};
     const allowed = ['estado_limpieza', 'estado_habitacion', 'asignado_a', 'no_molestar', 'comentarios'];
@@ -138,7 +139,7 @@ router.patch('/:id', requireAuth, (req, res) => {
 });
 
 // Upload photo for room type
-router.post('/tipo/:tipo/foto', requireAuth, requireRole('admin'), upload.single('foto'), validateUploadSignature, (req, res) => {
+router.post('/tipo/:tipo/foto', requireAuth, requireOperations, requireRole('admin'), upload.single('foto'), validateUploadSignature, (req, res) => {
   try {
     if (!req.file) return err(res, 'VALIDATION_ERROR', 'Archivo de imagen requerido');
     const tipo = req.params.tipo;
@@ -153,7 +154,7 @@ router.post('/tipo/:tipo/foto', requireAuth, requireRole('admin'), upload.single
 });
 
 // Get all room type photos
-router.get('/tipo-fotos', requireAuth, (req, res) => {
+router.get('/tipo-fotos', requireAuth, requireHousekeeping, (req, res) => {
   try {
     const db = getDb();
     const rows = db.prepare("SELECT clave, valor FROM config_hotel WHERE clave LIKE 'foto_tipo_%'").all();

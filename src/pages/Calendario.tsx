@@ -13,6 +13,7 @@ import InteractivePopover from '../components/InteractivePopover';
 import { useContextMenu } from '../hooks/useContextMenu';
 import ContextMenu from '../components/ContextMenu';
 import RoomRow from '../components/RoomRow';
+import { HousekeepingCalendar } from './Housekeeping';
 
 
 
@@ -42,7 +43,13 @@ function daysBetween(d1: string, d2: string) {
 const DAYS_TO_SHOW = 14;
 const ROOM_COL_W = 'w-36 min-w-[144px]';
 
-export default function Calendario() {
+export default function Calendario({ userRole }: { userRole?: string }) {
+  if (userRole === 'cleaning') return <HousekeepingCalendar />;
+  if (userRole !== 'admin' && userRole !== 'receptionist') return <div role="status" className="p-8 text-gray-400">Verificando permisos...</div>;
+  return <OperationsCalendar userRole={userRole} />;
+}
+
+function OperationsCalendar({ userRole }: { userRole: string }) {
   const navigate = useNavigate();
   const [startDate, setStartDate] = useState(() => {
     const d = new Date();
@@ -54,7 +61,6 @@ export default function Calendario() {
   const [loading, setLoading] = useState(true);
   const [tooltip, setTooltip] = useState<{ reserva: any; x: number; y: number } | null>(null);
   const [catFilter, setCatFilter] = useState('');
-  const [userRole, setUserRole] = useState('receptionist');
   const [activeGroupCode, setActiveGroupCode] = useState<string | null>(null);
 
   // Quick Payment Modal States
@@ -87,15 +93,6 @@ export default function Calendario() {
 
   const desde = formatDate(dates[0]);
   const hasta = formatDate(addDays(dates[dates.length - 1], 1));
-
-  // Retrieve user role on mount
-  useEffect(() => {
-    api.get('/auth/me')
-      .then(r => {
-        if (r.data && r.data.rol) setUserRole(r.data.rol);
-      })
-      .catch(() => {});
-  }, []);
 
   const load = () => {
     setLoading(true);

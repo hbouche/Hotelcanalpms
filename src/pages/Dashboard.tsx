@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { api } from '../api/client';
 import { BedDouble, ArrowDownRight, ArrowUpRight, DollarSign, CalendarDays, Users, TrendingUp } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { HousekeepingDashboard } from './Housekeeping';
 
 const estadoColor: Record<string, string> = {
   'Confirmada': 'bg-blue-100 text-blue-700',
@@ -20,7 +21,13 @@ const periodos = [
   { key: 'total', label: 'Total' },
 ];
 
-export default function Dashboard() {
+export default function Dashboard({ userRole }: { userRole?: string }) {
+  if (userRole === 'cleaning') return <HousekeepingDashboard />;
+  if (userRole !== 'admin' && userRole !== 'receptionist') return <div role="status" className="p-8 text-gray-400">Verificando permisos...</div>;
+  return <OperationsDashboard />;
+}
+
+function OperationsDashboard() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [periodo, setPeriodo] = useState('mes');

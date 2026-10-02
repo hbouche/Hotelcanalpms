@@ -17,9 +17,15 @@ const estadoHabColors: Record<string, string> = {
 
 const typeOrder: Record<string, number> = { 'Familiar': 1, 'Doble': 2, 'Estándar': 3, 'Camping': 4, 'Bohío': 1, 'Salón': 2, 'Restaurante': 3 };
 
-export default function Habitaciones() {
+export default function Habitaciones({ userRole }: { userRole?: string }) {
+  if (!userRole || !['admin', 'receptionist', 'cleaning'].includes(userRole)) return <div role="status" className="p-8 text-gray-400">Verificando permisos...</div>;
+  return <RoomManagement key={userRole} canEditRoom={userRole === 'admin' || userRole === 'receptionist'} />;
+}
+
+function RoomManagement({ canEditRoom }: { canEditRoom: boolean }) {
   const [rooms, setRooms] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [selected, setSelected] = useState<number[]>([]);
   const [editRoom, setEditRoom] = useState<any>(null);
   const [editForm, setEditForm] = useState({ asignado_a: '', no_molestar: 0, comentarios: '' });
@@ -27,7 +33,7 @@ export default function Habitaciones() {
   const [limpiezaFilter, setLimpiezaFilter] = useState('');
   const [activeDropdownRoomId, setActiveDropdownRoomId] = useState<number | null>(null);
 
-  const load = () => { api.get('/habitaciones').then(r => { setRooms(r.data); setLoading(false); }); };
+  const load = () => { setError(''); api.get('/habitaciones').then(r => setRooms(r.data)).catch(() => setError('No se pudieron cargar las habitaciones.')).finally(() => setLoading(false)); };
   useEffect(() => { load(); }, []);
 
   const toggleLimpieza = async (id: number, current: string) => {
@@ -42,17 +48,21 @@ export default function Habitaciones() {
 
   const bulkAction = async (estado: string) => {
     if (selected.length === 0) return;
-    await api.patch('/habitaciones/masiva', { ids: selected, estado_limpieza: estado });
-    setSelected([]);
-    load();
+    try {
+      await api.patch('/habitaciones/masiva', { ids: selected, estado_limpieza: estado });
+      setSelected([]);
+      load();
+    } catch { setError('No se pudo actualizar la limpieza. Inténtelo de nuevo.'); }
   };
 
   const openEdit = (room: any) => {
+    if (!canEditRoom) return;
     setEditRoom(room);
     setEditForm({ asignado_a: room.asignado_a || '', no_molestar: room.no_molestar || 0, comentarios: room.comentarios || '' });
   };
 
   const saveEdit = async () => {
+    if (!canEditRoom || !editRoom) return;
     await api.patch(`/habitaciones/${editRoom.id}`, editForm);
     setEditRoom(null);
     load();
@@ -106,6 +116,8 @@ export default function Habitaciones() {
         </div>
       </div>
 
+      {error && <div role="alert" className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error} <button onClick={load} className="underline">Reintentar</button></div>}
+
       {/* Filters */}
       <div className="bg-white rounded-xl p-3 mb-4 flex flex-wrap gap-2 items-center shadow-sm">
         <span className="text-xs text-gray-400 font-medium">Categoría:</span>
@@ -158,7 +170,7 @@ export default function Habitaciones() {
                           <span className="font-bold text-gray-800 text-sm">{room.nombre}</span>
                         </div>
                         <div className="flex items-center gap-1">
-                          {room.comentarios && (
+                          {canEditRoom && room.comentarios && (
                             <div className="relative group/tooltip inline-block mr-1">
                               <span className="cursor-pointer text-xs hover:scale-110 transition duration-150" title="Ver Comentarios">💬</span>
                               <div className="absolute bottom-full right-0 mb-2 hidden group-hover/tooltip:block w-48 p-2.5 bg-gray-900/95 backdrop-blur-md border border-white/10 text-white text-[11px] leading-relaxed rounded-xl shadow-xl z-30 pointer-events-none text-left">
@@ -169,7 +181,7 @@ export default function Habitaciones() {
                             </div>
                           )}
                           <span className={`text-[10px] ${estadoHabColors[room.estado_habitacion] || ''}`}>{room.estado_habitacion}</span>
-                          <button onClick={() => openEdit(room)} className="text-gray-300 hover:text-gray-500 text-xs" title="Editar">⚙️</button>
+                          {canEditRoom && <button onClick={() => openEdit(room)} className="text-gray-300 hover:text-gray-500 text-xs" title="Editar">⚙️</button>}
                         </div>
                       </div>
                       
@@ -200,8 +212,10 @@ export default function Habitaciones() {
                                   key={opt.id}
                                   onClick={async () => {
                                     setActiveDropdownRoomId(null);
-                                    await api.patch(`/habitaciones/${room.id}/limpieza`, { estado_limpieza: opt.id });
-                                    load();
+                                    try {
+                                      await api.patch(`/habitaciones/${room.id}/limpieza`, { estado_limpieza: opt.id });
+                                      load();
+                                    } catch { setError('No se pudo actualizar la limpieza. Inténtelo de nuevo.'); }
                                   }}
                                   className={`w-full px-2.5 py-1.5 rounded-lg text-left text-xs font-semibold text-gray-700 transition ${opt.color} flex items-center gap-1.5`}
                                 >
@@ -214,10 +228,10 @@ export default function Habitaciones() {
                         )}
                       </div>
 
-                      {(room.no_molestar === 1 || room.asignado_a) && (
+                      {(room.no_molestar === 1 || (canEditRoom && room.asignado_a)) && (
                         <div className="mt-1.5 space-y-0.5">
                           {room.no_molestar === 1 && <div className="text-[10px] text-red-500 font-medium">🚫 No Molestar</div>}
-                          {room.asignado_a && <div className="text-[10px] text-gray-400">👤 {room.asignado_a}</div>}
+                          {canEditRoom && room.asignado_a && <div className="text-[10px] text-gray-400">👤 {room.asignado_a}</div>}
                         </div>
                       )}
                     </div>
@@ -232,7 +246,7 @@ export default function Habitaciones() {
       {filteredRooms.length === 0 && <div className="text-center text-gray-400 py-8">No hay habitaciones con los filtros seleccionados</div>}
 
       {/* Edit Modal */}
-      {editRoom && (
+      {canEditRoom && editRoom && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setEditRoom(null)}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-5">
