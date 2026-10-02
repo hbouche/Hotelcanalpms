@@ -16,11 +16,13 @@ export default function Login({ onLogin }: { onLogin: (email: string, password: 
   };
 
   return (
-    <main className="relative isolate min-h-screen min-h-[100svh] bg-mahana-900 flex items-center justify-center px-4 py-8 sm:p-8">
+    <main className="relative isolate min-h-screen min-h-[100svh] overflow-hidden bg-mahana-900 flex items-center justify-center px-4 py-8 sm:p-8 md:justify-start lg:px-[8vw]">
       <img src="/hotel-panama-canal-login.webp" alt="" aria-hidden="true"
-        className="absolute inset-0 -z-20 h-full w-full object-cover object-center" fetchPriority="high" />
-      <div aria-hidden="true" className="absolute inset-0 -z-10 bg-gradient-to-br from-black/45 via-black/25 to-mahana-900/60" />
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 sm:p-8 ring-1 ring-white/20">
+        className="absolute inset-0 -z-30 h-full w-full scale-110 object-cover blur-2xl opacity-50" />
+      <img src="/hotel-panama-canal-login.webp" alt="" aria-hidden="true"
+        className="absolute inset-0 -z-20 h-full w-full object-contain object-center md:object-right lg:object-[85%_center]" fetchPriority="high" />
+      <div aria-hidden="true" className="absolute inset-0 -z-10 bg-gradient-to-r from-mahana-900/35 via-transparent to-black/10" />
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md md:max-w-sm lg:max-w-md p-6 sm:p-8 ring-1 ring-white/20">
         <div className="text-center mb-8">
           <img src="/hotel-panama-canal-reference.jpg" alt="Hotel Panamá Canal" width="96" height="96" className="mx-auto mb-4 rounded-xl" />
 
