@@ -1,0 +1,36 @@
+# Approved scope: one Starter service and one 1 GB persistent disk.
+# Target base budget: USD 7.25/month. Confirm taxes/overages before activation.
+# This file does not provision resources by itself.
+services:
+  - type: web
+    name: hotel-panama-canal-pms
+    runtime: node
+    plan: starter
+    numInstances: 1
+    disk:
+      name: hotel-panama-canal-data
+      mountPath: /var/data
+      sizeGB: 1
+    autoDeployTrigger: off
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: DATA_DIR
+        value: /var/data/hotel-panama-canal
+      - key: NODE_VERSION
+        value: 22.22.0
+      - key: NODE_ENV
+        value: production
+      - key: EXTERNAL_INTEGRATIONS_ENABLED
+        value: "false"
+      - key: CARD_PAYMENTS_ENABLED
+        value: "false"
+      - key: JWT_SECRET
+        sync: false
+      - key: INITIAL_ADMIN_EMAIL
+        sync: false
+      - key: INITIAL_ADMIN_PASSWORD
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false

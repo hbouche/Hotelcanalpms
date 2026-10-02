@@ -11,7 +11,8 @@ React 18, TypeScript, Vite 5 and Tailwind frontend; Express 4 / Node.js backend;
 - Hotel name: Hotel Panamá Canal. Contact details and policies await the hotel's confirmation
 - Temporary neutral brand placeholder; replace it with the hotel's approved logo before use
 - No inherited bank account, Yappy destination or payment instructions
-- PayPal, email, WhatsApp, CRM integrations and outbound webhooks are disabled by default at server level
+- Card/PayPal collection is disabled. Core reservation requests work after actual rooms/rates are configured; clients cannot declare online payment amounts
+- Email, WhatsApp, CRM integrations and outbound webhooks remain disabled until the new hotel's accounts/credentials, recipients and tests are authorized
 - No built-in production administrator password. Initial administrator credentials must be supplied by the operator through secure hosting settings
 - Source-specific operational scripts, lead exports, screenshots, private work notes, database files and source Git history are excluded
 - Automated tests use isolated, fictional fixtures under `NODE_ENV=test`; these fixtures are not loaded in normal operation
@@ -26,11 +27,13 @@ Required production environment variables:
 - `INITIAL_ADMIN_PASSWORD`: operator-chosen password of at least 16 characters
 - `ALLOWED_ORIGINS`: the exact application origin
 - `EXTERNAL_INTEGRATIONS_ENABLED=false`
+- `CARD_PAYMENTS_ENABLED=false`
+- `DATA_DIR=/var/data/hotel-panama-canal` on the configured Render disk
 
 Initial credentials are consumed only when no users exist; changing these variables does not reset an existing user's password. Secrets must never be committed or shared in chat. If initial credentials are absent, the database has no login user. `.env.example` documents variables; environment files are not automatically loaded by this application.
 
-## Render Free demo
-`render.yaml` proposes a single explicit Free Node Web Service with no disk or other paid resource and automatic deployments disabled. It does not deploy anything on its own.
+## Render persistent deployment
+`render.yaml` defines the approved scope: one Starter Node Web Service, one 1 GB persistent disk mounted at `/var/data`, and `DATA_DIR=/var/data/hotel-panama-canal`. Automatic deployments are off. The approved target budget is USD 7.25/month; confirm the actual checkout total, taxes and workspace usage/overages before activation. This file does not deploy or purchase anything by itself.
 
 Build: `npm ci --include=dev && npm run build`
 
@@ -38,17 +41,41 @@ Start: `npm start`
 
 Health: `/health`
 
-This is a disposable demo. Render Free sleeps after 15 minutes without inbound traffic, takes about one minute to wake, and does not support persistent disks. SQLite, users, configuration and uploads can disappear on sleep, restart or redeploy. Never enter real guest data or rely on this setup for hotel operations. Check shared workspace usage and overage settings before deployment; Free instance selection alone does not guarantee the entire account has no charges.
+SQLite, its WAL files, uploads and diagnostic logs use the same explicit `DATA_DIR`. SQLite uses WAL with `synchronous=FULL`. Without `DATA_DIR`, local development uses the repository's ignored `data/` directory; it never adopts an unrelated `/data` mount. A separate per-database SQLite lease prevents simultaneous PMS instances and full backup/restore operations and is released by the OS after a crash. Keep a single application process and a single instance on this local disk.
 
-Official references: [Free limits](https://render.com/docs/free), [Blueprint specification](https://render.com/docs/blueprint-spec), [Pricing](https://render.com/pricing).
+The mounted disk preserves data across ordinary restarts and deploys. It does not protect against deletion, corruption or account/disk loss. Only paths below the mount persist. Render disk-backed services cannot scale to multiple instances and deploy with a brief interruption; the disk is unavailable during builds, pre-deploy steps and one-off jobs. Monitor the 1 GB usage in Render. Diagnostic file logs rotate at 5 MiB (three files each for error/combined, two for notifications); database audit/history and uploads still grow and need an operator retention policy. Never expand the disk or plan automatically beyond the approved budget.
 
-For durable use, evaluate a separately approved persistent-storage plan or an explicit database migration. This code uses SQLite and does not support PostgreSQL merely by supplying a `DATABASE_URL`.
+Official references: [Persistent disks and limitations](https://render.com/docs/disks), [Blueprint specification](https://render.com/docs/blueprint-spec), [Pricing](https://render.com/pricing).
+
+This is a durable single-instance foundation, not a claim of production readiness. Before real guest use, complete operator acceptance tests, access/privacy review, an encrypted offsite backup destination and retention schedule, a successful recovery rehearsal, and hotel policy/inventory setup. This code uses SQLite; supplying `DATABASE_URL` does not add PostgreSQL support.
+
+## Backup and recovery
+Persistence is not a backup. The repository includes explicit operator-run tools, with no automatic upload, schedule, external account, credentials or additional paid resources. Backups contain private hotel records, password hashes and guest files; configuration may also contain sensitive integration values if later enabled. Keep them encrypted, restrict access, never commit them or share them in chat. Hosting environment secrets are excluded and must remain separately available in the operator's secure hosting settings.
+
+### Online database-only copy
+Run `node server/scripts/backup.js --database-only --output /tmp/hotel-canal-database-YYYYMMDD.sqlite` in the service shell. It uses SQLite's native online backup API, including committed WAL records, and checks SQLite integrity/foreign keys. It can run while the PMS is open. It excludes uploads and is clearly marked as database-only; it is not a complete hotel recovery bundle. Never copy a live `.db` file by itself with ordinary filesystem copy tools.
+
+### Complete, consistent database and uploads
+1. Schedule a short maintenance window. Stop the PMS process, or set `STORAGE_MAINTENANCE_MODE=true` in the service environment and restart/redeploy. In maintenance mode `/health` reports `maintenance`, all hotel requests return 503, and the database and background jobs stay closed. Wait for the previous process to finish. Changing this flag requires an operator action; no script changes hosting settings.
+2. In the disk-owning service shell run `node server/scripts/backup.js --offline --output /tmp/hotel-canal-backup-YYYYMMDD`. The tool refuses an active PMS lease, then creates a native SQLite snapshot, copies uploads and produces a SHA-256 manifest. It verifies referenced guest documents, checksums and database integrity. Diagnostic log files are excluded; relational audit history remains in the database.
+3. The result is a private directory bundle with `database.sqlite`, `uploads/` and `manifest.json`. If a single transfer file is needed, archive that completed bundle with `tar -czf /tmp/hotel-canal-backup-YYYYMMDD.tar.gz -C /tmp hotel-canal-backup-YYYYMMDD`. Extract only trusted self-created archives into an empty private directory before using the restore tool.
+4. Download the bundle/archive to the operator's approved encrypted offsite destination, then verify and rehearse recovery. The script requires a new output outside both `DATA_DIR` and Git; `/tmp` is temporary staging and is lost on restart. Transfer it before leaving maintenance mode. It creates no recurring copies and deletes no older backup. An offsite copy, retention schedule and responsible operator still need to be configured.
+5. Remove `STORAGE_MAINTENANCE_MODE` or set it to `false`, restart/redeploy and confirm normal health and login. Securely remove temporary backup copies after the offsite copy has been verified.
+
+### Restore without overwriting live data
+1. Keep the PMS stopped or in maintenance mode. Retain the current data directory; never delete it merely to make restore pass. Select a new directory below the persistent mount, for example `/var/data/hotel-panama-canal-recovered`. On a 1 GB disk, retaining the old data and staging/restoring another copy can require more free space than is available. Inspect usage first; do not increase paid capacity without approval.
+2. Run `node server/scripts/restore.js --from /private/extracted-backup --data-dir /var/data/hotel-panama-canal-recovered --offline`. The tool verifies the manifest, hashes, database integrity and document files before publishing. It refuses an existing database, a nonempty uploads directory, active storage lease, path traversal or symlinks. There is no force/overwrite option. It never accepts or uses a raw disk snapshot as SQLite recovery input.
+3. Point `DATA_DIR` at the recovered directory only after verification, preserve hosting secrets, disable maintenance, and restart. Check login, actual reservations, balances and a sample uploaded document. Keep the old directory until recovery is accepted; switching paths is an explicit operator decision.
+4. A crash during restore leaves `.restore-incomplete` and prevents normal startup. Inspect/recover that destination offline or choose a fresh destination and rerun from the verified bundle; do not delete the marker and assume the restore completed.
+
+Do not rely on Render filesystem snapshots as the database-native recovery procedure. No offsite backup or automatic restore is enabled by these local tools.
 
 ## Validation
 - `npm run build`: frontend production build
 - `npm test`: inherited and regression tests
 - `npx tsc --noEmit`: TypeScript check
 - `npm run test:clean`: clean-install and default-off integration smoke checks
+- `node server/tests/persistence.smoke.js`: isolated restart, WAL backup, full recovery, corruption/no-overwrite/offline guards and maintenance checks
 
 ## Branding and setup checklist
 1. Supply the official transparent PNG or SVG logo; replace the temporary asset used in login, header, booking and quotation screens
