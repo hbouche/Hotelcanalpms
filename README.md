@@ -20,12 +20,12 @@ React 18, TypeScript, Vite 5 and Tailwind frontend; Express 4 / Node.js backend;
 ## Local setup
 Use Node 22 LTS and npm. Run `npm ci --include=dev`, then `npm run build`. Set the environment variables below and run `npm start`. For frontend development, run `npm run dev` in a second terminal. The API defaults to port 3201 and Vite to 3200.
 
-Required production environment variables:
+Production environment variables:
 - `NODE_ENV=production`
-- `JWT_SECRET`: a long, unique secret entered by the operator
+- `JWT_SECRET`: a long, unique signing secret; the Render Blueprint generates it privately when the operator creates the service
 - `INITIAL_ADMIN_EMAIL`: operator-chosen initial admin email
 - `INITIAL_ADMIN_PASSWORD`: operator-chosen password of at least 16 characters
-- `ALLOWED_ORIGINS`: the exact application origin
+- `ALLOWED_ORIGINS`: optional explicit origin list for custom domains; on Render the app defaults to its assigned `RENDER_EXTERNAL_URL`. Without either, production does not enable cross-origin access.
 - `EXTERNAL_INTEGRATIONS_ENABLED=false`
 - `CARD_PAYMENTS_ENABLED=false`
 - `DATA_DIR=/var/data/hotel-panama-canal` on the configured Render disk
@@ -33,7 +33,7 @@ Required production environment variables:
 Initial credentials are consumed only when no users exist; changing these variables does not reset an existing user's password. Secrets must never be committed or shared in chat. If initial credentials are absent, the database has no login user. `.env.example` documents variables; environment files are not automatically loaded by this application.
 
 ## Render persistent deployment
-`render.yaml` defines the approved scope: one Starter Node Web Service, one 1 GB persistent disk mounted at `/var/data`, and `DATA_DIR=/var/data/hotel-panama-canal`. Automatic deployments are off. The approved target budget is USD 7.25/month; confirm the actual checkout total, taxes and workspace usage/overages before activation. This file does not deploy or purchase anything by itself.
+`render.yaml` defines the approved scope: one Starter Node Web Service, one 1 GB persistent disk mounted at `/var/data`, and `DATA_DIR=/var/data/hotel-panama-canal`. Automatic service deployments are off; also disable automatic Blueprint synchronization in the Dashboard. The base price is USD 7.25/month plus applicable taxes and approved workspace bandwidth overages. Confirm actual checkout details before activation. The operator enters the initial admin email and password in Render and submits the Blueprint, which also creates the private signing secret. This file does not deploy or purchase anything by itself.
 
 Build: `npm ci --include=dev && npm run build`
 

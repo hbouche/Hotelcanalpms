@@ -27,10 +27,8 @@ services:
       - key: CARD_PAYMENTS_ENABLED
         value: "false"
       - key: JWT_SECRET
-        sync: false
+        generateValue: true
       - key: INITIAL_ADMIN_EMAIL
         sync: false
       - key: INITIAL_ADMIN_PASSWORD
-        sync: false
-      - key: ALLOWED_ORIGINS
         sync: false
