@@ -17,8 +17,8 @@ export default function Login({ onLogin }: { onLogin: (email: string, password: 
 
   return (
     <main className="relative isolate min-h-screen min-h-[100svh] overflow-hidden bg-mahana-900 flex items-center justify-center px-4 py-8 sm:p-8 md:justify-start lg:px-[8vw]">
-      <img src="/hotel-panama-canal-login.webp" alt="" aria-hidden="true"
-        className="absolute inset-0 -z-30 h-full w-full scale-110 object-cover blur-2xl opacity-50" />
+      <img src="/hotel-panama-canal-facade.webp" alt="" aria-hidden="true"
+        className="absolute inset-0 -z-30 h-full w-full object-cover object-center" />
       <img src="/hotel-panama-canal-login.webp" alt="" aria-hidden="true"
         className="absolute inset-0 -z-20 h-full w-full object-contain object-center md:object-right lg:object-[85%_center]" fetchPriority="high" />
       <div aria-hidden="true" className="absolute inset-0 -z-10 bg-gradient-to-r from-mahana-900/35 via-transparent to-black/10" />
