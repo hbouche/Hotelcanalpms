@@ -393,3 +393,12 @@ CREATE TABLE IF NOT EXISTS reservas_eliminadas_log (
   eliminado_por TEXT,
   fecha TEXT DEFAULT (datetime('now'))
 );
+
+-- Authentication metadata only: never store submitted identifiers, secrets or IPs.
+CREATE TABLE IF NOT EXISTS accesos_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  usuario_id INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
+  resultado TEXT NOT NULL CHECK (resultado IN ('exitoso', 'fallido')),
+  fecha TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+CREATE INDEX IF NOT EXISTS idx_accesos_usuario_resultado ON accesos_log(usuario_id, resultado, id DESC);

@@ -23,6 +23,17 @@ function getDb() {
     db.pragma('busy_timeout = 5000');
     db.pragma('foreign_keys = ON');
 
+    // Snapshot committed WAL data before the one-time additive migration.
+    const usersExist = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='usuarios'").get();
+    const logExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='accesos_log'").get();
+    if (usersExist && !logExists) {
+      const backup = DB_PATH + '.before-access-log-' + require('crypto').randomUUID() + '.sqlite';
+      db.prepare('VACUUM INTO ?').run(backup);
+      fs.chmodSync(backup, 0o600);
+      const fd = fs.openSync(backup, 'r+');
+      try { fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
+    }
+
     // Initialize schema
     const schema = fs.readFileSync(SCHEMA_PATH, 'utf-8');
     

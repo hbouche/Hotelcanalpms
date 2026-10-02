@@ -381,6 +381,21 @@ const { hashPassword } = require('../auth');
 // USER MANAGEMENT CRUD
 // ══════════════════════════════════════
 
+// Administrator history uses current account identity, never submitted login data.
+router.get('/accesos', requireAuth, requireRole('admin'), (req, res) => {
+  try {
+    const before = req.query.before === undefined ? null : Number(req.query.before);
+    if (before !== null && (!Number.isSafeInteger(before) || before < 1)) return err(res, 'VALIDATION_ERROR', 'Cursor inválido');
+    const rows = getDb().prepare(`SELECT a.id, a.usuario_id, a.resultado, a.fecha, u.email
+      FROM accesos_log a LEFT JOIN usuarios u ON u.id = a.usuario_id
+      WHERE (? IS NULL OR a.id < ?) ORDER BY a.id DESC LIMIT 51`).all(before, before);
+    const data = rows.slice(0, 50);
+    ok(res, data, { next: rows.length > 50 ? data[data.length - 1].id : null });
+  } catch {
+    err(res, 'SERVER_ERROR', 'Error consultando accesos', 500);
+  }
+});
+
 router.get('/usuarios', requireAuth, requireRole('admin'), (req, res) => {
   try {
     const { page = 1, limit = 50, search } = req.query;
@@ -395,7 +410,7 @@ router.get('/usuarios', requireAuth, requireRole('admin'), (req, res) => {
     const offset = (Number(page) - 1) * Number(limit);
     
     const total = db.prepare(`SELECT COUNT(*) as c FROM usuarios ${where}`).get(...params).c;
-    const users = db.prepare(`SELECT id, email, nombre, rol, activo, created_at FROM usuarios ${where} ORDER BY nombre ASC LIMIT ? OFFSET ?`).all(...params, Number(limit), offset);
+    const users = db.prepare(`SELECT id, email, nombre, rol, activo, created_at, (SELECT fecha FROM accesos_log WHERE usuario_id = usuarios.id AND resultado = 'exitoso' ORDER BY id DESC LIMIT 1) AS ultimo_acceso FROM usuarios ${where} ORDER BY nombre ASC LIMIT ? OFFSET ?`).all(...params, Number(limit), offset);
     
     ok(res, users, { total, page: Number(page), limit: Number(limit), pages: Math.ceil(total / Number(limit)) });
   } catch (e) {

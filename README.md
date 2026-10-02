@@ -95,3 +95,35 @@ Do not rely on Render filesystem snapshots as the database-native recovery proce
 5. Keep all external integrations disabled until the relevant account, recipient data and test plan have been explicitly authorized
 
 Preserved module and CSS identifiers may retain historical names for compatibility. They do not connect to the previous hotel's services.
+
+
+### Registro persistente de inicios de sesión
+
+La tabla SQLite `accesos_log` conserva únicamente ID del evento, ID de cuenta
+reconocida (o NULL), resultado exitoso/fallido y fecha UTC. Registra contraseñas
+incorrectas, cuentas desconocidas/desactivadas y solicitudes incompletas o con
+tipos inválidos. No guarda contraseña, hash, token, IP ni correo ingresado. No
+registra actividad posterior de sesión, logout ni solicitudes con API key.
+Un inicio exitoso se entrega solamente después de persistir su evento.
+
+En **Personal**, exclusivamente administradores ven el último inicio exitoso
+por cuenta y el historial paginado de 50 eventos. Recepción y limpieza no tienen
+acceso a estas APIs ni a la página. Las API keys con permiso `admin` conservan
+el acceso administrativo existente; las de lectura/escritura no lo tienen.
+El correo mostrado corresponde al registro actual de la cuenta, no a una
+identidad personal verificada. Un intento fallido contra una cuenta tampoco
+prueba quién intentó ingresar. No se reconstruye actividad previa a la
+activación: el último acceso aparece como **Sin registro** hasta el primer éxito.
+
+La migración es aditiva e idempotente. Antes de aplicarla a una base existente,
+crea `hotel-canal.db.before-access-log-<uuid>.sqlite` junto a la base en DATA_DIR
+mediante `VACUUM INTO`, incluyendo datos confirmados en WAL. Si el respaldo
+falla, el arranque se detiene antes de la migración. No cambia usuarios,
+contraseñas, reservas ni archivos. El respaldo contiene datos privados y debe
+tratarse como los demás respaldos; requiere espacio para una copia de la base.
+Este respaldo local sólo contiene SQLite y no sustituye un bundle completo
+con uploads ni una copia externa. Antes de publicar, usar el procedimiento de
+respaldo existente y comprobar recuperación. No se borra historial de forma
+automática. Los respaldos habituales de SQLite incluyen todos los eventos.
+
+Validación específica: `npx vitest run server/routes/access-log.test.js`.

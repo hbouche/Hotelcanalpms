@@ -9,10 +9,23 @@ interface User {
   rol: 'admin' | 'receptionist' | 'cleaning';
   activo: number;
   created_at: string;
+  ultimo_acceso: string | null;
 }
 
 export default function Usuarios() {
   const [users, setUsers] = useState<User[]>([]);
+  const [accesses, setAccesses] = useState<{id: number; email: string | null; resultado: string; fecha: string}[]>([]);
+  const [nextAccess, setNextAccess] = useState<number | null>(null);
+  const [accessLoading, setAccessLoading] = useState(false);
+  const [accessError, setAccessError] = useState('');
+  const loadAccesses = (before?: number) => {
+    setAccessError('');
+    setAccessLoading(true);
+    api.get('/admin/accesos', { params: before ? { before } : {} }).then(r => {
+      setAccesses(prev => before ? [...prev, ...r.data] : r.data);
+      setNextAccess(r.meta?.next ?? null);
+    }).catch(() => setAccessError('No se pudo cargar el registro de accesos.')).finally(() => setAccessLoading(false));
+  };
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
@@ -45,6 +58,7 @@ export default function Usuarios() {
 
   useEffect(() => {
     loadUsers();
+    loadAccesses();
   }, []);
 
   useEffect(() => {
@@ -228,6 +242,7 @@ export default function Usuarios() {
                   <th className="px-6 py-4 text-left font-medium">Nombre</th>
                   <th className="px-6 py-4 text-left font-medium">Correo Electrónico</th>
                   <th className="px-6 py-4 text-left font-medium">Rol</th>
+                  <th className="px-6 py-4 text-left font-medium">Último inicio exitoso</th>
                   <th className="px-6 py-4 text-center font-medium w-32">Estado</th>
                   <th className="px-6 py-4 text-right font-medium w-32">Acciones</th>
                 </tr>
@@ -255,6 +270,7 @@ export default function Usuarios() {
                     <td className="px-6 py-4">
                       {getRoleBadge(u.rol)}
                     </td>
+                    <td className="px-6 py-4">{u.ultimo_acceso ? new Date(u.ultimo_acceso).toLocaleString() : "Sin registro"}</td>
                     <td className="px-6 py-4 text-center">
                       <div className="flex items-center justify-center">
                         <label className="relative inline-flex items-center cursor-pointer">
@@ -288,6 +304,18 @@ export default function Usuarios() {
         )}
       </div>
 
+      <section className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
+        <h2 className="font-semibold">Registro de inicios de sesión</h2>
+        <p className="text-sm text-gray-500">Desde la activación de esta función. Identifica cuentas, no personas que utilizan cuentas compartidas. Horas en la zona local del navegador.</p>
+        <button disabled={accessLoading} onClick={() => { loadAccesses(); loadUsers(); }} className="text-sm text-blue-700">Actualizar registro</button>
+        {accessError && <p role="alert">{accessError}</p>}
+        {!accessLoading && !accessError && accesses.length === 0 && <p>Sin registros de acceso.</p>}
+        <div className="overflow-x-auto"><table className="w-full text-sm text-left">
+          <thead><tr><th>Fecha</th><th>Cuenta</th><th>Resultado</th></tr></thead>
+          <tbody>{accesses.map(a => <tr key={a.id}><td className="py-2">{new Date(a.fecha).toLocaleString()}</td><td>{a.email || 'Cuenta no identificada'}</td><td>{a.resultado === 'exitoso' ? 'Exitoso' : 'Fallido'}</td></tr>)}</tbody>
+        </table></div>
+        {nextAccess && <button disabled={accessLoading} onClick={() => loadAccesses(nextAccess)} className="text-sm text-blue-700">Cargar anteriores</button>}
+      </section>
       {/* Add / Edit Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
