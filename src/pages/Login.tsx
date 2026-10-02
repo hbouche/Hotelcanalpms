@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { Hotel } from 'lucide-react';
 
 export default function Login({ onLogin }: { onLogin: (email: string, password: string) => Promise<void> }) {
   const [email, setEmail] = useState('');
@@ -17,24 +16,27 @@ export default function Login({ onLogin }: { onLogin: (email: string, password: 
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-mahana-400 via-mahana-500 to-ocean-600 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
+    <main className="relative isolate min-h-screen min-h-[100svh] bg-mahana-900 flex items-center justify-center px-4 py-8 sm:p-8">
+      <img src="/hotel-panama-canal-login.webp" alt="" aria-hidden="true"
+        className="absolute inset-0 -z-20 h-full w-full object-cover object-center" fetchPriority="high" />
+      <div aria-hidden="true" className="absolute inset-0 -z-10 bg-gradient-to-br from-black/45 via-black/25 to-mahana-900/60" />
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 sm:p-8 ring-1 ring-white/20">
         <div className="text-center mb-8">
           <img src="/hotel-panama-canal-reference.jpg" alt="Hotel Panamá Canal" width="96" height="96" className="mx-auto mb-4 rounded-xl" />
 
           <h1 className="text-2xl font-bold text-gray-800">Hotel Panamá Canal</h1>
-          <p className="text-gray-400 text-sm mt-1">Sistema de Gestión Hotelera</p>
+          <p className="text-gray-500 text-sm mt-1">Sistema de Gestión Hotelera</p>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && <div className="bg-red-50 text-red-600 text-sm px-4 py-3 rounded-lg">{error}</div>}
           <div>
-            <label className="block text-sm font-medium text-gray-600 mb-1">Email</label>
-            <input type="email" value={email} onChange={e => setEmail(e.target.value)} required
+            <label htmlFor="login-email" className="block text-sm font-medium text-gray-600 mb-1">Email</label>
+            <input id="login-email" type="email" autoComplete="username" value={email} onChange={e => setEmail(e.target.value)} required
               className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-mahana-400 focus:border-transparent outline-none transition" placeholder="admin@example.invalid" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-600 mb-1">Contraseña</label>
-            <input type="password" value={password} onChange={e => setPassword(e.target.value)} required
+            <label htmlFor="login-password" className="block text-sm font-medium text-gray-600 mb-1">Contraseña</label>
+            <input id="login-password" type="password" autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)} required
               className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-mahana-400 focus:border-transparent outline-none transition" placeholder="••••••••" />
           </div>
           <button type="submit" disabled={loading}
@@ -43,6 +45,6 @@ export default function Login({ onLogin }: { onLogin: (email: string, password: 
           </button>
         </form>
       </div>
-    </div>
+    </main>
   );
 }
