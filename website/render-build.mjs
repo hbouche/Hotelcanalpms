@@ -16,7 +16,12 @@ if (process.env.SITE_MODE === 'withdrawn') {
   const html = '<!doctype html><html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Demostración fuera de línea</title><body><h1>Demostración temporalmente fuera de línea.</h1><p>Hotel Panama Canal · Propuesta para revisión.</p></body></html>\n';
   writeFileSync(join(output, 'index.html'), html);
   writeFileSync(join(output, '404.html'), html);
-  console.log('WITHDRAWN: tiny HTML only. No images, scripts, PMS links or external requests.');
+  // Render can retain previously published paths: explicitly replace every public file.
+  for (const file of ['nosotros.html', 'contacto.html', 'area.html', 'creditos.html']) writeFileSync(join(output, file), html);
+  for (const file of ['style.css', 'app.js']) writeFileSync(join(output, file), '/* Demo withdrawn */\n');
+  mkdirSync(join(output, 'assets'));
+  for (const file of ['lake.jpg', 'gatun.jpg']) writeFileSync(join(output, 'assets', file), Buffer.alloc(0));
+  console.log('WITHDRAWN: tiny HTML and explicit empty replacements. No heavy assets, PMS links or external requests.');
 } else if (process.env.SITE_MODE === 'full') {
   await import('./build.mjs');
   const files = ['index.html', 'nosotros.html', 'contacto.html', 'area.html', 'creditos.html', 'style.css', 'app.js'];
