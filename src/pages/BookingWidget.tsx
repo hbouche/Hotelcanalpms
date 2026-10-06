@@ -2,9 +2,17 @@ import { useState, useEffect, useRef } from 'react'
 import { Calendar, Users, ChevronRight, Check, CreditCard, Loader2, MapPin, Star, Shield, ArrowLeft, Bed, Coffee, Sun, Waves, Clock, Mail, Phone, Globe, Upload } from 'lucide-react'
 
 const API = '/api/v1/public'
+const DEMO_MODE = false
+const initialSearch = new URLSearchParams(location.search)
+const requestedDate = initialSearch.get('fecha') || ''
+const parsedDate = new Date(requestedDate + 'T00:00:00Z')
+const initialDate = /^\d{4}-\d{2}-\d{2}$/.test(requestedDate) && Number.isFinite(parsedDate.getTime()) && parsedDate.toISOString().slice(0, 10) === requestedDate ? requestedDate : ''
+const initialAdults = Math.max(1, Math.min(20, Math.floor(Number(initialSearch.get('personas'))) || 1))
+const initialCategory = initialSearch.get('categoria') === 'Pasadía' ? 'Pasadía' : 'Estadía'
+const initialDeparture = initialDate ? (initialCategory === 'Pasadía' ? initialDate : new Date(Date.parse(initialDate + 'T00:00:00Z') + 86400000).toISOString().slice(0, 10)) : ''
 
 type RoomType = { tipo: string; categoria: string; capacidad_min: number; capacidad_max: number; total: number; disponibles: number }
-type Plan = { id: number; codigo: string; nombre: string; descripcion: string; precio_adulto_noche: number; precio_menor_noche: number; precio_mascota_noche?: number; incluye: string[]; horario: string; extras_disponibles: string[]; imagen: string | null }
+type Plan = { base_cobro?: string; id: number; codigo: string; nombre: string; descripcion: string; precio_adulto_noche: number; precio_menor_noche: number; precio_mascota_noche?: number; incluye: string[]; horario: string; extras_disponibles: string[]; imagen: string | null }
 type Cotizacion = { plan: { codigo: string; nombre: string }; noches: number; subtotal: number; impuesto_pct: number; impuesto_monto: number; monto_total: number; deposito_minimo: number; deposito_pct: number; desglose: { fecha: string; dia: string; tipo_dia: string; precio_adulto: number; total_noche: number }[] }
 type RoomAllocation = { tipo: string; adultos: number; menores: number; mascotas: number }
 
@@ -29,10 +37,10 @@ export default function BookingWidget() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [result, setResult] = useState<any>(null)
-  const [checkIn, setCheckIn] = useState('')
-  const [checkOut, setCheckOut] = useState('')
-  const [categoria, setCategoria] = useState<'Estadía' | 'Pasadía'>('Estadía')
-  const [adultos, setAdultos] = useState(1)
+  const [checkIn, setCheckIn] = useState(initialDate)
+  const [checkOut, setCheckOut] = useState(initialDeparture)
+  const [categoria, setCategoria] = useState<'Estadía' | 'Pasadía'>(new URLSearchParams(location.search).get('categoria') === 'Pasadía' ? 'Pasadía' : 'Estadía')
+  const [adultos, setAdultos] = useState(initialAdults)
   const [menores, setMenores] = useState(0)
   const [mascotas, setMascotas] = useState(0)
   const [adultosBuscados, setAdultosBuscados] = useState(1)
@@ -463,6 +471,8 @@ export default function BookingWidget() {
   const planImage = cart[0]?.plan.imagen || (cart[0]?.tipo ? (tipoFotos[cart[0].tipo] || defaultRoomImages[cart[0].tipo]) : '') || defaultRoomImages['Familiar']
 
   const requestUnpaidReservation = async () => {
+    // A demo is read-only even if this handler is invoked outside its button.
+    if (DEMO_MODE) { setError('DEMO de solo lectura: no se envían reservas, archivos ni pagos.'); return; }
     if (loading || !isGuestValid || !allMatch) return;
     setLoading(true); setError('');
     try {
@@ -483,7 +493,7 @@ export default function BookingWidget() {
     } catch (error: any) { setError(error.message || 'Error de conexión'); }
     finally { setLoading(false); }
   };
-  const stepLabels = ['Fechas', 'Habitaciones', 'Distribución', 'Resumen', 'Solicitud']
+  const stepLabels = ['Fechas', 'Habitaciones', 'Distribución', 'Resumen', 'Reservar']
 
   return (
     <div className="min-h-screen" style={{ background: 'linear-gradient(135deg, #fefbf3 0%, #fdf4e3 30%, #fef9ef 60%, #fffcf5 100%)' }}>
@@ -494,7 +504,7 @@ export default function BookingWidget() {
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight" style={{ fontFamily: "'Georgia', serif" }}>Hotel Panamá Canal</h1>
             <p className="text-amber-200/80 text-sm mt-0.5 flex items-center gap-1.5">
-              <MapPin className="w-3.5 h-3.5" /> Ubicación por configurar
+              <MapPin className="w-3.5 h-3.5" /> Espinar, Colón
             </p>
           </div>
         </div>
@@ -502,8 +512,10 @@ export default function BookingWidget() {
 
       <div className="max-w-3xl mx-auto px-4 pt-6">
         <div className="rounded-2xl border border-amber-200 bg-white p-4 text-sm text-amber-900" role="status">
-          <strong>Hotel en configuración</strong>
-          <p className="mt-1">La disponibilidad depende de las habitaciones y tarifas configuradas por Hotel Panamá Canal. Los cobros con tarjeta y PayPal están desactivados.</p>
+          <strong>{DEMO_MODE ? 'DEMO del PMS existente · Solo lectura' : 'Reservas en línea · Tarifas de prueba'}</strong>
+          <p className="mt-1">{DEMO_MODE
+            ? 'Este recorrido prueba la consulta a las API públicas del PMS. No crea reservas, no sube archivos y no procesa pagos. Los resultados dependen de la configuración actual; no son una oferta comercial confirmada.'
+            : 'La disponibilidad depende de las habitaciones y tarifas configuradas por Hotel Panamá Canal. Los cobros con tarjeta y PayPal están desactivados.'}</p>
         </div>
       </div>
 
@@ -731,7 +743,7 @@ export default function BookingWidget() {
                 <div className="space-y-4">
                   {roomTypes.map(rt => {
                     const Icon = roomIcons[rt.tipo] || Bed
-                    const img = tipoFotos[rt.tipo] || defaultRoomImages[rt.tipo] || defaultRoomImages['Familiar']
+                    const img = tipoFotos[rt.tipo] || allRoomPlans[rt.tipo]?.find(p=>p.imagen)?.imagen || defaultRoomImages[rt.tipo] || defaultRoomImages['Familiar']
                     const currentQty = cart.filter(x => x.tipo === rt.tipo).length
 
                     return (
@@ -744,6 +756,7 @@ export default function BookingWidget() {
                           <div className="flex-1 p-4 sm:p-5 flex flex-col justify-between">
                             <div>
                               <h3 className="font-bold text-gray-800 text-lg flex items-center gap-2"><Icon className="w-5 h-5 text-amber-600" /> {rt.tipo}</h3>
+                              {rt.tipo.endsWith('(prueba)') && <p className="text-xs text-stone-500 mt-1">Imagen conceptual IA · Condiciones por confirmar</p>}
                               <p className="text-sm text-gray-500 mt-1">{rt.capacidad_min}–{rt.capacidad_max} huéspedes</p>
                               <p className="text-xs text-emerald-600 mt-1 font-medium">{rt.disponibles} disponible{rt.disponibles > 1 ? 's' : ''}</p>
                             </div>
@@ -1071,13 +1084,13 @@ export default function BookingWidget() {
                         {/* Adults Breakdown Row */}
                         <div className="flex justify-between items-center py-0.5">
                           <span className="flex items-center gap-1.5 text-gray-700 font-medium">
-                            <span>{item.adultos} {item.adultos === 1 ? 'Adulto' : 'Adultos'}</span>
+                            <span>{item.plan.base_cobro === 'habitacion' ? '1 habitación' : `${item.adultos} ${item.adultos === 1 ? 'Adulto' : 'Adultos'}`}</span>
                             <span className="text-gray-400 font-normal">×</span>
                             <span>{categoria === 'Pasadía' ? '1 día' : `${noches} ${noches === 1 ? 'noche' : 'noches'}`}</span>
                             <span className="text-gray-400 font-normal">×</span>
                             <span>${item.plan.precio_adulto_noche.toFixed(2)}</span>
                           </span>
-                          <span className="font-bold text-gray-800">${(item.adultos * item.plan.precio_adulto_noche * (categoria === 'Pasadía' ? 1 : noches)).toFixed(2)}</span>
+                          <span className="font-bold text-gray-800">${((item.plan.base_cobro === 'habitacion' ? 1 : item.adultos) * item.plan.precio_adulto_noche * (categoria === 'Pasadía' ? 1 : noches)).toFixed(2)}</span>
                         </div>
 
                         {/* Minors Breakdown Row */}
@@ -1115,7 +1128,7 @@ export default function BookingWidget() {
                         {/* Suplemento / Ajuste por Fin de Semana o Feriado */}
                         {(() => {
                           const baseSubtotal = (
-                            (item.adultos * item.plan.precio_adulto_noche) +
+                            ((item.plan.base_cobro === 'habitacion' ? 1 : item.adultos) * item.plan.precio_adulto_noche) +
                             (item.menores * item.plan.precio_menor_noche) +
                             (item.mascotas * (item.plan.precio_mascota_noche || 0))
                           ) * (categoria === 'Pasadía' ? 1 : noches);
@@ -1220,7 +1233,7 @@ export default function BookingWidget() {
               <button disabled={!isGuestValid} onClick={() => setStep(5)}
                 className="w-full mt-6 py-4 text-white font-bold rounded-2xl hover:shadow-2xl transition-all duration-300 disabled:opacity-40 flex items-center justify-center gap-2 text-lg"
                 style={{ background: 'linear-gradient(135deg, #78350f, #92400e, #a16207)' }}>
-                <CreditCard className="w-5 h-5" /> Continuar al pago
+                <CreditCard className="w-5 h-5" /> Continuar a reservar
               </button>
             </div>
             <button onClick={() => setStep(3)} className="text-sm text-amber-700 hover:text-amber-900 font-medium flex items-center gap-1"><ArrowLeft className="w-4 h-4" /> Volver a distribución</button>
@@ -1229,7 +1242,7 @@ export default function BookingWidget() {
 
         {step === 6 && result && (
           <div className="bg-white rounded-3xl p-8 border border-mahana-200 text-center" role="status">
-            <h2 className="text-2xl font-bold text-mahana-800">Solicitud guardada</h2>
+            <h2 className="text-2xl font-bold text-mahana-800">Reserva registrada</h2>
             <p className="mt-3">Pendiente de revisión por el hotel. No se ha realizado ningún cobro.</p>
             <p className="mt-2 font-semibold">Referencia: {result.grupo_codigo || result.id || 'Consulta con recepción'}</p>
             <button onClick={() => { setCart([]); setResult(null); setStep(1); }} className="mt-5 text-mahana-700 underline">Volver al inicio</button>
@@ -1255,13 +1268,13 @@ export default function BookingWidget() {
               )}
 
               <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 text-center" role="status">
-                <h3 className="font-bold text-amber-900">Solicitar reserva sin pago online</h3>
-                <p className="text-sm text-amber-800 mt-2">El hotel revisará esta solicitud. No se realizará ningún cobro con tarjeta ni PayPal y no se registrará dinero recibido. Coordina cualquier pago directamente con recepción.</p>
+                <h3 className="font-bold text-amber-900">Reserva sin pago online</h3>
+                <p className="text-sm text-amber-800 mt-2">La reserva quedará pendiente de confirmación en recepción. No se realizará ningún cobro con tarjeta ni PayPal y no se registrará dinero recibido. Coordina cualquier pago directamente con recepción.</p>
               </div>
 
-              <button type="button" disabled={loading || !isGuestValid || !allMatch} onClick={requestUnpaidReservation}
+              <button type="button" disabled={DEMO_MODE || loading || !isGuestValid || !allMatch} onClick={requestUnpaidReservation}
                 className="w-full mt-4 py-3 rounded-xl bg-mahana-700 text-white font-semibold disabled:opacity-50">
-                {loading ? 'Guardando solicitud...' : 'Enviar solicitud de reserva'}
+                {DEMO_MODE ? 'DEMO · Envío de solicitudes deshabilitado' : (loading ? 'Guardando reserva...' : 'Reservar')}
               </button>
               {/* Collapsible Detailed Reservation Summary */}
               <div className="mt-8 border-t border-gray-100 pt-6">
@@ -1304,13 +1317,13 @@ export default function BookingWidget() {
                           {/* Adults Breakdown Row */}
                           <div className="flex justify-between items-center py-0.5">
                             <span className="flex items-center gap-1.5 text-gray-700 font-medium">
-                              <span>{item.adultos} {item.adultos === 1 ? 'Adulto' : 'Adultos'}</span>
+                              <span>{item.plan.base_cobro === 'habitacion' ? '1 habitación' : `${item.adultos} ${item.adultos === 1 ? 'Adulto' : 'Adultos'}`}</span>
                               <span className="text-gray-400 font-normal">×</span>
                               <span>{categoria === 'Pasadía' ? '1 día' : `${noches} ${noches === 1 ? 'noche' : 'noches'}`}</span>
                               <span className="text-gray-400 font-normal">×</span>
                               <span>${item.plan.precio_adulto_noche.toFixed(2)}</span>
                             </span>
-                            <span className="font-bold text-gray-800">${(item.adultos * item.plan.precio_adulto_noche * (categoria === 'Pasadía' ? 1 : noches)).toFixed(2)}</span>
+                            <span className="font-bold text-gray-800">${((item.plan.base_cobro === 'habitacion' ? 1 : item.adultos) * item.plan.precio_adulto_noche * (categoria === 'Pasadía' ? 1 : noches)).toFixed(2)}</span>
                           </div>
 
                           {/* Minors Breakdown Row */}
@@ -1348,7 +1361,7 @@ export default function BookingWidget() {
                           {/* Suplemento / Ajuste por Fin de Semana o Feriado */}
                           {(() => {
                             const baseSubtotal = (
-                              (item.adultos * item.plan.precio_adulto_noche) +
+                              ((item.plan.base_cobro === 'habitacion' ? 1 : item.adultos) * item.plan.precio_adulto_noche) +
                               (item.menores * item.plan.precio_menor_noche) +
                               (item.mascotas * (item.plan.precio_mascota_noche || 0))
                             ) * (categoria === 'Pasadía' ? 1 : noches);
@@ -1395,7 +1408,7 @@ export default function BookingWidget() {
 
       {/* Footer */}
       <footer className="text-center py-8 text-xs text-gray-400 space-y-1">
-        <p>&copy; {new Date().getFullYear()} Hotel Panamá Canal · Ubicación por configurar</p>
+        <p>&copy; {new Date().getFullYear()} Hotel Panamá Canal · Espinar, Colón</p>
         <div className="flex items-center justify-center gap-4">
           <span className="flex items-center gap-1"><Shield className="w-3 h-3" /> Reservas del hotel</span>
           <span className="flex items-center gap-1"><Waves className="w-3 h-3" /> Información del hotel por configurar</span>

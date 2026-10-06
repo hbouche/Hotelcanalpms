@@ -61,7 +61,7 @@ function getDb() {
       }
     }
 
-    const notifExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='notificaciones_log'").get();
+    const notifExists = db.prepare("SELECTname FROM sqlite_master WHERE type='table' AND name='notificaciones_log'").get();
     if (notifExists) {
       const notifCols = db.prepare('PRAGMA table_info(notificaciones_log)').all().map(c => c.name);
       if (!notifCols.includes('contenido')) {
@@ -651,6 +651,10 @@ Te recordamos que tu estadía inicia *{{etiqueta_dias}}*:
 
     } // end test-only service fixtures
 
+    if (!db.prepare('PRAGMA table_info(planes_tarifa)').all().some(c => c.name === 'base_cobro')) {
+      db.exec("ALTER TABLE planes_tarifa ADD COLUMN base_cobro TEXT NOT NULL DEFAULT 'persona'");
+    }
+    if (process.env.HB_WEB_PRELOAD === '20261006') require('../normal-web-seed').seedNormalWeb(db);
     console.log('✅ Database initialized at', DB_PATH);
     } catch (error) {
       resetDb();

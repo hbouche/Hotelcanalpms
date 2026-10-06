@@ -102,7 +102,7 @@ router.get('/planes', (req, res) => {
   try {
     const { tipo } = req.query; // optional room type filter
     const db = getDb();
-    let plans = db.prepare("SELECT id, codigo, nombre, descripcion, categoria, precio_adulto_noche, precio_menor_noche, precio_mascota_noche, incluye, horario, extras_disponibles, tipos_aplicables, imagen FROM planes_tarifa WHERE activo = 1 AND visible_web = 1").all();
+    let plans = db.prepare("SELECT id, codigo, nombre, descripcion, categoria, base_cobro, precio_adulto_noche, precio_menor_noche, precio_mascota_noche, incluye, horario, extras_disponibles, tipos_aplicables, imagen FROM planes_tarifa WHERE activo = 1 AND visible_web = 1").all();
     // Filter by room type if provided
     if (tipo) {
       plans = plans.filter(p => {
@@ -323,7 +323,7 @@ router.post('/reservar', (req, res) => {
     // Calculate totals
     const totals = calcReservationWithRates(plan.id, check_in, check_out, +adultos, +menores, +mascotas);
     const noches = calcNoches(check_in, check_out);
-    const paidAmount = parseFloat(monto_pagado) || 0;
+    const paidAmount = require('../normal-web-seed').isWebTestReservation({plan_codigo}) ? 0 : (parseFloat(monto_pagado) || 0);
 
     const data = {
       cliente: sanitize(cliente), apellido: sanitize(apellido || ''), email: sanitize(email), whatsapp: sanitize(whatsapp || ''),
@@ -547,7 +547,7 @@ router.post('/reservas/multi', upload.single('comprobante'), validateUploadSigna
       const noches = calcNoches(check_in, check_out);
 
       // Associate full paid amount to the first booking in group
-      const paidAmount = index === 0 ? (parseFloat(monto_pagado) || 0) : 0;
+      const paidAmount = require('../normal-web-seed').isWebTestReservation({plan_codigo}) ? 0 : (index === 0 ? (parseFloat(monto_pagado) || 0) : 0);
 
       const data = {
         cliente: sanitize(cliente),

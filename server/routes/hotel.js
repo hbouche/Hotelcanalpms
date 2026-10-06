@@ -6,6 +6,7 @@ const { getDb, findById, create, update } = require('../db/database');
 const { requireAuth, requireRole, requireOperations, requireHousekeeping } = require('../auth');
 const { housekeepingRoom } = require('../housekeeping');
 const { calcNoches, calcReservation, calcReservationWithRates, getConfig } = require('../utils/calculations');
+const { isDayPass, validBookingDates, overlapSql } = require('../utils/booking-dates');
 const { fireWebhooks } = require('../utils/webhooks');
 const { upload, validateUploadSignature, UPLOADS_DIR } = require('../utils/upload');
 const notifications = require('../notifications');
@@ -235,16 +236,20 @@ router.get('/hotel/disponibilidad', requireAuth, requireOperations, (req, res) =
     if (!check_in || !check_out) return err(res, 'VALIDATION_ERROR', 'check_in y check_out requeridos');
     const db = getDb();
     // Find rooms with conflicting reservations
-    const occupied = db.prepare(`
-      SELECT DISTINCT habitacion_id FROM reservas_hotel
-      WHERE estado NOT IN ('Cancelada', 'No-Show', 'Check-Out')
-        AND check_in < ? AND check_out > ?
-    `).all(check_out, check_in).map(r => r.habitacion_id);
-
     const allRooms = db.prepare('SELECT * FROM habitaciones WHERE activa = 1 ORDER BY id').all();
+    if (!allRooms.some(room => validBookingDates(room, check_in, check_out))) {
+      return err(res, 'VALIDATION_ERROR', 'Fechas inválidas: estadía requiere salida posterior; pasadía permite el mismo día');
+    }
+    const occupied = db.prepare(`
+      SELECT DISTINCT r.habitacion_id FROM reservas_hotel r
+      JOIN habitaciones h ON h.id = r.habitacion_id
+      WHERE r.estado NOT IN ('Cancelada', 'No-Show', 'Check-Out')
+        AND ((h.categoria = 'Pasadía' AND r.check_in <= ? AND r.check_out >= ?)
+          OR (COALESCE(h.categoria, 'Estadía') <> 'Pasadía' AND r.check_in < ? AND r.check_out > ?))
+    `).all(check_out, check_in, check_out, check_in).map(r => r.habitacion_id);
     const available = allRooms.map(room => ({
       ...room,
-      disponible: !occupied.includes(room.id)
+      disponible: validBookingDates(room, check_in, check_out) && !occupied.includes(room.id)
     }));
     ok(res, available);
   } catch (e) { err(res, 'SERVER_ERROR', 'Error verificando disponibilidad', 500); }
@@ -262,9 +267,9 @@ router.get('/hotel/calendario', requireAuth, requireHousekeeping, (req, res) => 
       FROM reservas_hotel r
       LEFT JOIN habitaciones h ON r.habitacion_id = h.id
       WHERE r.estado NOT IN ('Cancelada', 'No-Show')
-        AND r.check_in < ? AND r.check_out ${req.user?.rol === 'cleaning' ? '>=' : '>'} ?
+        AND ((h.categoria = 'Pasadía' AND r.check_in <= ? AND r.check_out >= ?) OR (COALESCE(h.categoria,'Estadía') <> 'Pasadía' AND r.check_in < ? AND r.check_out ${req.user?.rol === 'cleaning' ? '>=' : '>'} ?))
       ORDER BY r.check_in
-    `).all(hasta, desde);
+    `).all(hasta, desde, hasta, desde);
     if (req.user?.rol === 'cleaning') {
       return ok(res, {
         housekeeping: true,
@@ -293,7 +298,7 @@ router.get('/hotel/reservas', requireAuth, requireOperations, (req, res) => {
     const conditions = [];
     const params = [];
     if (estado) { conditions.push('estado = ?'); params.push(estado); }
-    if (tipo_habitacion) { conditions.push('tipo_habitacion = ?'); params.push(tipo_habitacion); }
+    if(tipo_habitacion) { conditions.push('tipo_habitacion = ?'); params.push(tipo_habitacion); }
     if (cliente) { conditions.push('(cliente LIKE ? OR apellido LIKE ?)'); params.push(`%${cliente}%`, `%${cliente}%`); }
     if (check_in_desde) { conditions.push('check_in >= ?'); params.push(check_in_desde); }
     if (check_in_hasta) { conditions.push('check_in <= ?'); params.push(check_in_hasta); }
@@ -388,15 +393,14 @@ router.post('/hotel/reservas/grupo', requireAuth, requireOperations, (req, res) 
         if (!cliente || !check_in || !check_out || !habitacion_id) {
           throw new Error(`Campos requeridos faltantes para la habitación en índice ${index}`);
         }
-        if (check_out <= check_in) {
-          throw new Error(`Check-out debe ser posterior al check-in para ${cliente}`);
-        }
+        const selectedUnit=findById('habitaciones',habitacion_id);
+        if(!selectedUnit||!validBookingDates(selectedUnit,check_in,check_out)) throw new Error(`Fechas inválidas para ${cliente}`);
 
         // Overlap Check in DB
         const conflict = db.prepare(`
           SELECT id, cliente, check_in, check_out FROM reservas_hotel
           WHERE habitacion_id = ? AND estado NOT IN ('Cancelada', 'No-Show', 'Check-Out')
-            AND check_in < ? AND check_out > ?
+            AND ${overlapSql(selectedUnit)}
         `).get(habitacion_id, check_out, check_in);
 
         if (conflict) {
@@ -406,7 +410,7 @@ router.post('/hotel/reservas/grupo', requireAuth, requireOperations, (req, res) 
         // In-memory Overlap check within the payload
         for (const [otherIndex, otherR] of reservas.entries()) {
           if (index !== otherIndex && otherR.habitacion_id === habitacion_id) {
-            if (check_in < otherR.check_out && check_out > otherR.check_in) {
+            if (isDayPass(selectedUnit) ? check_in <= otherR.check_out && check_out >= otherR.check_in : check_in < otherR.check_out && check_out > otherR.check_in) {
               throw new Error(`Conflicto interno: La habitación ID ${habitacion_id} está duplicada en fechas coincidentes dentro del mismo grupo.`);
             }
           }
@@ -667,8 +671,14 @@ router.post('/hotel/reservas', requireAuth, requireOperations, (req, res) => {
     if (!habitacion_id) missing.push('habitacion_id');
     if (missing.length > 0) return err(res, 'VALIDATION_ERROR', `Campos requeridos: ${missing.join(', ')}`);
 
-    // Date validation
-    if (check_out <= check_in) return err(res, 'VALIDATION_ERROR', 'Check-out debe ser posterior al check-in');
+    // Category comes from the stored unit, never from client-provided labels.
+    const selectedUnit = findById('habitaciones', habitacion_id);
+    if (!selectedUnit || !selectedUnit.activa) return err(res, 'NOT_FOUND', 'Unidad activa no encontrada', 404);
+    if (!validBookingDates(selectedUnit, check_in, check_out)) {
+      return err(res, 'VALIDATION_ERROR', isDayPass(selectedUnit)
+        ? 'Fechas inválidas: salida de pasadía no puede ser anterior a entrada'
+        : 'Fechas inválidas: check-out debe ser posterior al check-in');
+    }
     const todayStr = new Date().toISOString().split('T')[0];
     if (check_in < todayStr) return err(res, 'VALIDATION_ERROR', 'No se puede reservar en el pasado');
 
@@ -682,7 +692,7 @@ router.post('/hotel/reservas', requireAuth, requireOperations, (req, res) => {
       const conflict = db.prepare(`
         SELECT id, cliente, check_in, check_out FROM reservas_hotel
         WHERE habitacion_id = ? AND estado NOT IN ('Cancelada', 'No-Show', 'Check-Out')
-          AND check_in < ? AND check_out > ?
+          AND ${overlapSql(room)}
       `).get(habitacion_id, check_out, check_in);
 
       if (conflict) {
@@ -797,7 +807,9 @@ router.post('/hotel/reservas', requireAuth, requireOperations, (req, res) => {
     // Create initial folio entries
     if (data.subtotal > 0) {
       db.prepare('INSERT INTO folio_hotel (reserva_id, tipo, concepto, monto, registrado_por) VALUES (?, ?, ?, ?, ?)').run(
-        reserva.id, 'debito', `Habitación: ${data.plan_nombre || 'Tarifa base'} (${noches} noches)`, data.subtotal, req.user.nombre
+        reserva.id, 'debito', isDayPass(selectedUnit)
+          ? `Pasadía: ${data.plan_nombre || 'Tarifa base'} (por persona/día)`
+          : `Habitación: ${data.plan_nombre || 'Tarifa base'} (${noches} noches)`, data.subtotal, req.user.nombre
       );
     }
     if (data.impuesto_monto > 0) {
@@ -831,6 +843,14 @@ router.put('/hotel/reservas/:id', requireAuth, requireOperations, (req, res) => 
       if (req.body[f] !== undefined) data[f] = typeof req.body[f] === 'string' ? sanitize(req.body[f]) : req.body[f];
     }
 
+    const effectiveRoomId = data.habitacion_id === '' ? null : (data.habitacion_id ?? existing.habitacion_id);
+    const effectiveRoom = effectiveRoomId ? findById('habitaciones', effectiveRoomId) : null;
+    const effectiveIn = data.check_in ?? existing.check_in;
+    const effectiveOut = data.check_out ?? existing.check_out;
+    if (!validBookingDates(effectiveRoom, effectiveIn, effectiveOut)) {
+      return err(res, 'VALIDATION_ERROR', 'Fechas inválidas para la categoría de la unidad');
+    }
+
     // Recalculate if pricing changed
     const merged = { ...existing, ...data };
     if (data.adultos !== undefined || data.menores !== undefined || data.mascotas !== undefined ||
@@ -857,7 +877,7 @@ router.put('/hotel/reservas/:id', requireAuth, requireOperations, (req, res) => 
         const conflict = db.prepare(`
           SELECT id, cliente FROM reservas_hotel
           WHERE habitacion_id = ? AND id != ? AND estado NOT IN ('Cancelada', 'No-Show', 'Check-Out')
-            AND check_in < ? AND check_out > ?
+            AND ${overlapSql(effectiveRoom)}
         `).get(roomId, req.params.id, co, ci);
         if (conflict) return err(res, 'ROOM_OCCUPIED', `Habitación ocupada por ${conflict.cliente}`);
       }
@@ -1257,7 +1277,7 @@ router.post('/hotel/reservas/:id/folio/:folioId/reversar', requireAuth, requireO
       if (original.tipo === 'credito') {
         // Reversión de pago -> Genera un débito
         concept = `Reversión de pago [ID ${original.id}]: ${original.concepto}`;
-        db.prepare('INSERT INTO folio_hotel (reserva_id, tipo, concepto, monto, registrado_por) VALUES (?, ?, ?, ?, ?)').run(
+     db.prepare('INSERT INTO folio_hotel (reserva_id, tipo, concepto, monto, registrado_por) VALUES (?, ?, ?, ?, ?)').run(
           req.params.id, 'debito', concept, original.monto, req.user.nombre
         );
 
@@ -1582,7 +1602,7 @@ router.get('/hotel/dashboard', requireAuth, requireHousekeeping, (req, res) => {
       const occP = db.prepare(`
         SELECT COUNT(DISTINCT r.habitacion_id) as c FROM reservas_hotel r
         JOIN habitaciones h ON r.habitacion_id = h.id
-        WHERE h.categoria = 'Pasadía' AND r.estado NOT IN ('Cancelada', 'No-Show') AND r.check_in <= ? AND r.check_out > ?
+        WHERE h.categoria = 'Pasadía' AND r.estado NOT IN ('Cancelada', 'No-Show') AND r.check_in <= ? AND r.check_out >= ?
       `).get(ds, ds).c;
       timelineEstadia.push({ fecha: ds, ocupadas: occE, pct: totalEstadia > 0 ? Math.round((occE / totalEstadia) * 100) : 0 });
       timelinePasadia.push({ fecha: ds, ocupadas: occP, pct: totalPasadia > 0 ? Math.round((occP / totalPasadia) * 100) : 0 });

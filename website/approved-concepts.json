@@ -1,0 +1,26 @@
+{
+  "demo-room-wide.webp": {
+    "git_blob_sha": "f3d5c0f02d02885ccba635f619da636aa0627c14",
+    "bytes": 243340,
+    "sha256": "4be661e989faa4ea647c9a3c57e802822bc85eaac682628914e8f799cc217ce3",
+    "classification": "Approved conceptual AI illustration; historical reference, not evidence of current facilities."
+  },
+  "demo-room-bed.webp": {
+    "git_blob_sha": "06dff3305f2359c4fc4cbaf3304ad482cf0c6186",
+    "bytes": 230852,
+    "sha256": "a8a3720e26c64544f74c40a6b0e351d4ca84de154b5c2f4804d7c56c326df797",
+    "classification": "Approved conceptual AI illustration; historical reference, not evidence of current facilities."
+  },
+  "demo-pool.webp": {
+    "git_blob_sha": "5be981747430b274e881d349d557314c125956cf",
+    "bytes": 333552,
+    "sha256": "f8118156f463691f6b5a3b9fdcf6a4a75a738f6f0537539c81e737b73fdffc3e",
+    "classification": "Approved conceptual AI illustration; historical reference, not evidence of current facilities."
+  },
+  "demo-daypass-offer.webp": {
+    "git_blob_sha": "c0e57028d194058e1718aa2b294a29ef0792c0b9",
+    "bytes": 341580,
+    "sha256": "13748c67dc4e738982421b646cd8b30df321d87fef4887b8393e7c7f33505478",
+    "classification": "Approved conceptual AI illustration; historical reference, not evidence of current facilities."
+  }
+}

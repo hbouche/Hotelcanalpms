@@ -131,7 +131,7 @@ export default function NuevaReserva() {
 
   // Load available rooms when dates change
   useEffect(() => {
-    if (form.check_in && form.check_out && form.check_out > form.check_in) {
+    if (form.check_in && form.check_out && (isPasadia ? form.check_out >= form.check_in : form.check_out > form.check_in)) {
       api.get(`/hotel/disponibilidad?check_in=${form.check_in}&check_out=${form.check_out}`)
         .then(r => {
           setRooms(r.data);
@@ -142,7 +142,7 @@ export default function NuevaReserva() {
           }
         });
     } else { setRooms([]); }
-  }, [form.check_in, form.check_out]);
+  }, [form.check_in, form.check_out, isPasadia]);
 
   const selectedPlan = useMemo(() => {
     return planes.find(p => p.codigo === form.plan_codigo);
@@ -339,7 +339,7 @@ export default function NuevaReserva() {
     selectedGroupRooms,
     roomConfigs,
     form.plan_codigo,
-    form.adultos,
+  form.adultos,
     form.menores,
     form.mascotas,
     form.check_in,
@@ -577,8 +577,8 @@ ${altRatesStr}
   // Validations
   const todayStr = new Date().toISOString().split('T')[0];
   const pastDateError = form.check_in && form.check_in < todayStr ? 'No se puede reservar en el pasado' : '';
-  const dateError = form.check_in && form.check_out && form.check_out <= form.check_in
-    ? 'Check-out debe ser después del check-in' : '';
+  const dateError = form.check_in && form.check_out && (isPasadia ? form.check_out < form.check_in : form.check_out <= form.check_in)
+    ? (isPasadia ? 'La salida no puede ser anterior a la fecha del pasadía' : 'Check-out debe ser después del check-in') : '';
   const totalGuests = form.adultos + form.menores;
   const selectedRoom = rooms.find((r: any) => r.id == form.habitacion_id);
   const selectedRoomAvailable = !form.habitacion_id || selectedRoom?.disponible;

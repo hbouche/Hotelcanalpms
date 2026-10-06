@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, writeFileSync, cpSync, rmSync } from 'node:fs';
 import { resolve, join, dirname, basename } from 'node:path';
+import { PUBLIC_ASSETS } from './assets-manifest.mjs';
 
 const root = resolve('website');
 const output = resolve(root, 'site');
@@ -20,15 +21,15 @@ if (process.env.SITE_MODE === 'withdrawn') {
   for (const file of ['nosotros.html', 'contacto.html', 'area.html', 'creditos.html']) writeFileSync(join(output, file), html);
   for (const file of ['style.css', 'app.js']) writeFileSync(join(output, file), '/* Demo withdrawn */\n');
   mkdirSync(join(output, 'assets'));
-  for (const file of ['lake.jpg', 'gatun.jpg']) writeFileSync(join(output, 'assets', file), Buffer.alloc(0));
+  for (const file of PUBLIC_ASSETS) writeFileSync(join(output, 'assets', file), Buffer.alloc(0));
   console.log('WITHDRAWN: tiny HTML and explicit empty replacements. No heavy assets, PMS links or external requests.');
 } else if (process.env.SITE_MODE === 'full') {
   await import('./build.mjs');
   const files = ['index.html', 'nosotros.html', 'contacto.html', 'area.html', 'creditos.html', 'style.css', 'app.js'];
   for (const file of files) cpSync(join(root, file), join(output, file));
   mkdirSync(join(output, 'assets'));
-  for (const file of ['lake.jpg', 'gatun.jpg']) cpSync(join(root, 'assets', file), join(output, 'assets', file));
-  console.log('FULL: five public pages and two verified licensed originals. Internal source files excluded.');
+  for (const file of PUBLIC_ASSETS) cpSync(join(root, 'assets', file), join(output, 'assets', file));
+  console.log('FULL: five public pages, two licensed originals and four approved conceptual illustrations. Internal source files excluded.');
 } else {
   throw new Error('Explicit SITE_MODE=withdrawn or full required');
 }

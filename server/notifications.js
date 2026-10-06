@@ -841,3 +841,10 @@ module.exports = {
     }
   }
 };
+
+// Test-rate products use the NORMAL PMS and inventory, but never send external messages.
+for (const name of ['notifyReservationConfirmed','notifyStatusChange','notifyPaymentReceived','notifyAdminNewBooking','notifyReminder']) {
+  const original=module.exports[name];
+  module.exports[name]=(...args)=>require('./normal-web-seed').isWebTestReservation(args[0])
+    ? Promise.resolve({sent:false,reason:'HB test-rate product; communications suppressed'}) : original(...args);
+}

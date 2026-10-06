@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS planes_tarifa (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   codigo TEXT NOT NULL UNIQUE,
   nombre TEXT NOT NULL,
+  base_cobro TEXT NOT NULL DEFAULT 'persona', -- persona or habitacion; existing plans retain persona
   descripcion TEXT,
   categoria TEXT DEFAULT 'Estadía',       -- "Estadía", "Pasadía", "Otro"
   precio_adulto_noche REAL NOT NULL,

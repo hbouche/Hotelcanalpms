@@ -1,6 +1,8 @@
+> HISTORICAL / SUPERSEDED: HB now requests the normal `/reservar` engine. See normal-web-preload.md. The isolated design below is retained only as prior implementation history.
+
 # Catálogo y reservas DEMO aisladas
 
-La petición de HB del 6 octubre 2026 sustituye el paquete previo de tres categorías: dos productos de habitación a USD 100 por habitación/noche y un pasadía a USD 38.50 por persona/día. Son ejemplos ficticios sin vigencia comercial, impuestos e inclusiones por confirmar. Las cuatro imágenes conceptuales fueron aprobadas. Su transferencia oficial de Library falló en este entorno; no se incorporan bytes no verificados. La publicación visual queda pendiente de materialización en un entorno con acceso.
+La petición de HB del 6 octubre 2026 sustituye el paquete previo de tres categorías: dos productos de habitación a USD 100 por habitación/noche y un pasadía a USD 38.50 por persona/día. Son ejemplos ficticios sin vigencia comercial, impuestos e inclusiones por confirmar. Las cuatro imágenes conceptuales aprobadas se integran como WebP verificados contra los blobs del repositorio, con avisos de concepto IA. Se conservan composición y precios DEMO; ambas habitaciones son vistas de una misma referencia histórica, no evidencia de dos tipologías actuales. La retirada usa una única lista de seis assets y sustituye todos por cero bytes.
 
 ## Aislamiento
 

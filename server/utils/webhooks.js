@@ -6,6 +6,10 @@ const WEBHOOK_EVENTS = ['reserva.creada', 'reserva.estado', 'reserva.actualizada
 // Fire webhook helper
 function fireWebhooks(evento, payload) {
   if (!require('../integration-policy').integrationsEnabled()) return;
+  if (payload?.reserva_id) {
+    const reservation=getDb().prepare('SELECT plan_codigo FROM reservas_hotel WHERE id=?').get(payload.reserva_id);
+    if(require('../normal-web-seed').isWebTestReservation(reservation)) return;
+  }
   try {
     const db = getDb();
     const hooks = db.prepare("SELECT * FROM webhooks WHERE activo = 1").all();
