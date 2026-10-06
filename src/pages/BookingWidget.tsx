@@ -123,7 +123,7 @@ export default function BookingWidget() {
       const resp = await fetch(`${API}/disponibilidad?check_in=${checkIn}&check_out=${checkOut}&categoria=${categoria}`)
       const data = await resp.json()
       if (!data.success) { setError(data.error?.message || 'Error'); return }
-      if (data.data.tipos_disponibles.length === 0) { setError('No hay habitaciones disponibles o configuradas. La administración debe completar habitaciones y tarifas antes de abrir reservas.'); return }
+      if (data.data.tipos_disponibles.length === 0) { setError('No hay unidades disponibles o configuradas para esta experiencia. La administración debe completar el inventario y las tarifas antes de abrir reservas.'); return }
       
       setRoomTypes(data.data.tipos_disponibles)
       
@@ -271,7 +271,7 @@ export default function BookingWidget() {
         const resp = await fetch(`${API}/cotizar?plan=${plan.codigo}&adultos=${alloc.adultos}&menores=${alloc.menores}&mascotas=${alloc.mascotas}&check_in=${checkIn}&check_out=${checkOut}`)
         const data = await resp.json()
         if (!data.success) {
-          throw new Error(data.error?.message || `Error cotizando habitación sugerida de tipo ${alloc.tipo}`)
+          throw new Error(data.error?.message || `Error cotizando la unidad sugerida de tipo ${alloc.tipo}`)
         }
         
         newCartItems.push({
@@ -331,7 +331,7 @@ export default function BookingWidget() {
       }
       setCart(prev => [...prev, newItem])
     } catch {
-      setError('Error cotizando habitación')
+      setError('Error cotizando la unidad')
     } finally {
       setLoading(false)
     }
@@ -422,7 +422,7 @@ export default function BookingWidget() {
       setSelectedPlan(null)
       setStep(2) // return to available room types list to choose more!
     } catch {
-      setError('Error cotizando habitación')
+      setError('Error cotizando la unidad')
     } finally {
       setLoading(false)
     }
@@ -493,7 +493,7 @@ export default function BookingWidget() {
     } catch (error: any) { setError(error.message || 'Error de conexión'); }
     finally { setLoading(false); }
   };
-  const stepLabels = ['Fechas', 'Habitaciones', 'Distribución', 'Resumen', 'Reservar']
+  const stepLabels = ['Fechas', categoria === 'Pasadía' ? 'Pasadía' : 'Habitaciones', 'Distribución', 'Resumen', 'Reservar']
 
   return (
     <div className="min-h-screen" style={{ background: 'linear-gradient(135deg, #fefbf3 0%, #fdf4e3 30%, #fef9ef 60%, #fffcf5 100%)' }}>
@@ -515,7 +515,7 @@ export default function BookingWidget() {
           <strong>{DEMO_MODE ? 'DEMO del PMS existente · Solo lectura' : 'Reservas en línea · Tarifas de prueba'}</strong>
           <p className="mt-1">{DEMO_MODE
             ? 'Este recorrido prueba la consulta a las API públicas del PMS. No crea reservas, no sube archivos y no procesa pagos. Los resultados dependen de la configuración actual; no son una oferta comercial confirmada.'
-            : 'La disponibilidad depende de las habitaciones y tarifas configuradas por Hotel Panamá Canal. Los cobros con tarjeta y PayPal están desactivados.'}</p>
+            : 'La disponibilidad depende del inventario y las tarifas configuradas por Hotel Panamá Canal. Los cobros con tarjeta y PayPal están desactivados.'}</p>
         </div>
       </div>
 
@@ -646,7 +646,7 @@ export default function BookingWidget() {
                 <div className="bg-gradient-to-br from-amber-50 to-amber-100/40 border border-amber-200 rounded-3xl p-6 shadow-sm">
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-2">
                     <h3 className="font-bold text-amber-900 text-base flex items-center gap-2">
-                      <span>Tu Carrito de Habitaciones</span>
+                      <span>{categoria === 'Pasadía' ? 'Tu carrito de pasadías' : 'Tu Carrito de Habitaciones'}</span>
                       <span className="bg-amber-200 text-amber-900 text-xs px-2 py-0.5 rounded-full font-bold">{cart.length}</span>
                     </h3>
                     <button
@@ -707,10 +707,10 @@ export default function BookingWidget() {
                         El Sugerido
                       </span>
                       <h3 className="font-extrabold text-amber-900 text-lg sm:text-xl">
-                        Recomendación de Habitación Optimizada
+                        {categoria === 'Pasadía' ? 'Una opción para tu pasadía' : 'Recomendación de Habitación Optimizada'}
                       </h3>
                       <p className="text-sm text-amber-800/80 mt-1 leading-relaxed">
-                        Hemos encontrado la combinación perfecta de habitaciones que minimiza tus costos and se adapta a tus huéspedes y mascotas:
+                        {categoria === 'Pasadía' ? 'Estas unidades se adaptan a las personas de tu visita:' : 'Estas habitaciones se adaptan a tus huéspedes y mascotas:'}
                       </p>
                       <div className="flex flex-wrap gap-2 mt-3">
                         {sugerencia.map((s, idx) => (
@@ -735,7 +735,7 @@ export default function BookingWidget() {
               <div className="bg-white rounded-3xl shadow-xl p-6 sm:p-8 border border-amber-100/50">
                 <div className="flex items-center gap-3 mb-2">
                   <div className="w-10 h-10 rounded-2xl bg-amber-100 flex items-center justify-center"><Bed className="w-5 h-5 text-amber-700" /></div>
-                  <div><h2 className="text-xl font-bold text-gray-800">Elige una habitación para agregar</h2></div>
+                  <div><h2 className="text-xl font-bold text-gray-800">{categoria === 'Pasadía' ? 'Elige una unidad de pasadía' : 'Elige una habitación para agregar'}</h2></div>
                 </div>
                 <p className="text-sm text-gray-400 mb-6 ml-[52px]">
                   {categoria === 'Pasadía' ? 'Pasadía por el día' : `${noches} noche${noches > 1 ? 's' : ''}`} · {adultosBuscados} adulto{adultosBuscados > 1 ? 's' : ''}{menoresBuscados > 0 ? ` · ${menoresBuscados} menor${menoresBuscados > 1 ? 'es' : ''}` : ''}{mascotasBuscadas > 0 ? ` · ${mascotasBuscadas} mascota${mascotasBuscadas > 1 ? 's' : ''}` : ''}
@@ -776,21 +776,24 @@ export default function BookingWidget() {
                               >
                                 {allRoomPlans[rt.tipo]?.map(p => (
                                   <option key={p.codigo} value={p.codigo}>
-                                    {p.nombre} (${p.precio_adulto_noche}/{categoria === 'Pasadía' ? 'persona' : 'noche'})
+                                    {p.nombre}
                                   </option>
                                 ))}
                               </select>
+                              {selectedPlans[rt.tipo] && <p className="mt-2 text-sm text-gray-700 leading-relaxed break-words" data-selected-plan>
+                                {selectedPlans[rt.tipo].nombre} · ${selectedPlans[rt.tipo].precio_adulto_noche.toFixed(2)} / {categoria === 'Pasadía' ? 'persona / día' : (selectedPlans[rt.tipo].base_cobro === 'habitacion' ? 'habitación / noche' : 'persona / noche')}
+                              </p>}
                             </div>
 
                             {/* Sleek quantity selector */}
-                            <div className="flex items-center gap-3 mt-4 pt-3 border-t border-gray-100">
-                              <span className="text-xs font-bold text-amber-900 bg-amber-50 px-2 py-1 rounded-lg border border-amber-200/50">
-                                Habitaciones a reservar:
+                            <div className="flex flex-wrap items-center gap-2 mt-4 pt-3 border-t border-gray-100">
+                              <span className="w-full sm:w-auto text-xs font-bold text-amber-900 bg-amber-50 px-2 py-1 rounded-lg border border-amber-200/50">
+                                {categoria === 'Pasadía' ? 'Unidades a reservar:' : 'Habitaciones a reservar:'}
                               </span>
                               <button
                                 onClick={() => handleDecrement(rt)}
                                 disabled={currentQty === 0 || loading}
-                                className="w-8 h-8 rounded-full border border-gray-200 hover:border-amber-500 flex items-center justify-center font-bold text-gray-500 hover:text-amber-700 disabled:opacity-30 transition"
+                                className="w-11 h-11 shrink-0 rounded-full border border-gray-200 hover:border-amber-500 flex items-center justify-center font-bold text-gray-500 hover:text-amber-700 disabled:opacity-30 transition"
                               >
                                 -
                               </button>
@@ -800,7 +803,7 @@ export default function BookingWidget() {
                               <button
                                 onClick={() => handleIncrement(rt)}
                                 disabled={currentQty >= rt.disponibles || loading}
-                                className="w-8 h-8 rounded-full border border-gray-200 hover:border-amber-500 flex items-center justify-center font-bold text-gray-500 hover:text-amber-700 disabled:opacity-30 transition"
+                                className="w-11 h-11 shrink-0 rounded-full border border-gray-200 hover:border-amber-500 flex items-center justify-center font-bold text-gray-500 hover:text-amber-700 disabled:opacity-30 transition"
                               >
                                 +
                               </button>
@@ -820,7 +823,7 @@ export default function BookingWidget() {
                   <div className="mt-6 p-5 bg-gradient-to-br from-amber-50 to-amber-100/40 border border-amber-200 rounded-3xl flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm animate-fadeIn">
                     <div>
                       <span className="text-xs text-gray-500 block">
-                        Subtotal de tu selección ({cart.length} {cart.length === 1 ? 'habitación' : 'habitaciones'})
+                        Subtotal de tu selección ({cart.length} {categoria === 'Pasadía' ? (cart.length === 1 ? 'unidad' : 'unidades') : (cart.length === 1 ? 'habitación' : 'habitaciones')})
                       </span>
                       <p className="text-2xl font-bold text-amber-950">${totalMontoTotal.toFixed(2)}</p>
                     </div>
@@ -848,7 +851,7 @@ export default function BookingWidget() {
                 <div className="w-10 h-10 rounded-2xl bg-amber-100 flex items-center justify-center"><Users className="w-5 h-5 text-amber-700" /></div>
                 <div>
                   <h2 className="text-xl font-bold text-gray-800">Distribución de Huéspedes</h2>
-                  <p className="text-sm text-gray-400">Distribuye tus huéspedes y mascotas en las habitaciones seleccionadas</p>
+                  <p className="text-sm text-gray-400">{categoria === 'Pasadía' ? 'Distribuye las personas y mascotas en las unidades seleccionadas' : 'Distribuye tus huéspedes y mascotas en las habitaciones seleccionadas'}</p>
                 </div>
               </div>
               
@@ -867,7 +870,7 @@ export default function BookingWidget() {
                     <div key={item.id} className="p-5 rounded-2xl border border-gray-100 bg-gray-50/30 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                       <div className="space-y-1.5 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-bold text-gray-800 text-sm">Habitación {idx + 1}: {item.tipo}</span>
+                          <span className="font-bold text-gray-800 text-sm">{categoria === 'Pasadía' ? 'Unidad' : 'Habitación'} {idx + 1}: {item.tipo}</span>
                           <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded-full">
                             {item.plan.nombre}
                           </span>
@@ -880,7 +883,7 @@ export default function BookingWidget() {
                         <p className="text-xs text-gray-400">
                           Capacidad física: {capMin} - {capMax} huéspedes.
                         </p>
-                        {isAdultInvalid && <p className="text-[11px] text-red-500 font-medium">Debe haber al menos 1 adulto en cada habitación.</p>}
+                        {isAdultInvalid && <p className="text-[11px] text-red-500 font-medium">Debe haber al menos 1 adulto en cada unidad.</p>}
                         {isTooLow && <p className="text-[11px] text-red-500 font-medium">Faltan huéspedes para cumplir el mínimo de {capMin}.</p>}
                         {isTooHigh && <p className="text-[11px] text-red-500 font-medium">Se supera la capacidad máxima de {capMax} huéspedes.</p>}
                       </div>
@@ -893,14 +896,14 @@ export default function BookingWidget() {
                           <div className="flex items-center gap-2">
                             <button
                               onClick={() => updateCartItemGuests(item.id, Math.max(0, item.adultos - 1), item.menores, item.mascotas)}
-                              className="w-6 h-6 rounded-full border border-gray-200 hover:border-amber-500 flex items-center justify-center text-xs font-bold text-gray-500"
+                              className="w-11 h-11 shrink-0 rounded-full border border-gray-200 hover:border-amber-500 flex items-center justify-center text-xs font-bold text-gray-500"
                             >
                               -
                             </button>
                             <span className="text-xs font-bold text-gray-700 w-4 text-center">{item.adultos}</span>
                             <button
                               onClick={() => updateCartItemGuests(item.id, Math.min(30, item.adultos + 1), item.menores, item.mascotas)}
-                              className="w-6 h-6 rounded-full border border-gray-200 hover:border-amber-500 flex items-center justify-center text-xs font-bold text-gray-500"
+                              className="w-11 h-11 shrink-0 rounded-full border border-gray-200 hover:border-amber-500 flex items-center justify-center text-xs font-bold text-gray-500"
                             >
                               +
                             </button>
@@ -913,14 +916,14 @@ export default function BookingWidget() {
                           <div className="flex items-center gap-2">
                             <button
                               onClick={() => updateCartItemGuests(item.id, item.adultos, Math.max(0, item.menores - 1), item.mascotas)}
-                              className="w-6 h-6 rounded-full border border-gray-200 hover:border-amber-500 flex items-center justify-center text-xs font-bold text-gray-500"
+                              className="w-11 h-11 shrink-0 rounded-full border border-gray-200 hover:border-amber-500 flex items-center justify-center text-xs font-bold text-gray-500"
                             >
                               -
                             </button>
                             <span className="text-xs font-bold text-gray-700 w-4 text-center">{item.menores}</span>
                             <button
                               onClick={() => updateCartItemGuests(item.id, item.adultos, Math.min(15, item.menores + 1), item.mascotas)}
-                              className="w-6 h-6 rounded-full border border-gray-200 hover:border-amber-500 flex items-center justify-center text-xs font-bold text-gray-500"
+                              className="w-11 h-11 shrink-0 rounded-full border border-gray-200 hover:border-amber-500 flex items-center justify-center text-xs font-bold text-gray-500"
                             >
                               +
                             </button>
@@ -933,14 +936,14 @@ export default function BookingWidget() {
                           <div className="flex items-center gap-2">
                             <button
                               onClick={() => updateCartItemGuests(item.id, item.adultos, item.menores, Math.max(0, item.mascotas - 1))}
-                              className="w-6 h-6 rounded-full border border-gray-200 hover:border-amber-500 flex items-center justify-center text-xs font-bold text-gray-500"
+                              className="w-11 h-11 shrink-0 rounded-full border border-gray-200 hover:border-amber-500 flex items-center justify-center text-xs font-bold text-gray-500"
                             >
                               -
                             </button>
                             <span className="text-xs font-bold text-gray-700 w-4 text-center">{item.mascotas}</span>
                             <button
                               onClick={() => updateCartItemGuests(item.id, item.adultos, item.menores, Math.min(10, item.mascotas + 1))}
-                              className="w-6 h-6 rounded-full border border-gray-200 hover:border-amber-500 flex items-center justify-center text-xs font-bold text-gray-500"
+                              className="w-11 h-11 shrink-0 rounded-full border border-gray-200 hover:border-amber-500 flex items-center justify-center text-xs font-bold text-gray-500"
                             >
                               +
                             </button>
@@ -949,7 +952,7 @@ export default function BookingWidget() {
 
                         {/* Room Price */}
                         <div className="text-right pl-2 border-l border-gray-100 flex flex-col justify-center">
-                          <span className="text-[10px] text-gray-400 block font-semibold">Hab. Total</span>
+                          <span className="text-[10px] text-gray-400 block font-semibold">{categoria === 'Pasadía' ? 'Total unidad' : 'Hab. Total'}</span>
                           <span className="font-bold text-amber-800 text-sm">${item.monto_total.toFixed(2)}</span>
                         </div>
                       </div>
@@ -960,7 +963,7 @@ export default function BookingWidget() {
 
               <div className="mt-8 flex justify-between items-center">
                 <button onClick={() => setStep(2)} className="text-sm text-amber-700 hover:text-amber-900 font-medium flex items-center gap-1">
-                  <ArrowLeft className="w-4 h-4" /> Volver a habitaciones
+                  <ArrowLeft className="w-4 h-4" /> {categoria === 'Pasadía' ? 'Volver a pasadías' : 'Volver a habitaciones'}
                 </button>
               </div>
             </div>
@@ -1014,7 +1017,7 @@ export default function BookingWidget() {
                           {assignedMinors > menoresBuscados && <li>Sobran {assignedMinors - menoresBuscados} menor(es) asignado(s).</li>}
                           {assignedPets < mascotasBuscadas && <li>Faltan asignar {mascotasBuscadas - assignedPets} mascota(s) de tu búsqueda.</li>}
                           {assignedPets > mascotasBuscadas && <li>Sobran {assignedPets - mascotasBuscadas} mascota(s) asignada(s).</li>}
-                          {hasCapacityViolation && <li>Revisa las advertencias de capacidad física en cada habitación.</li>}
+                          {hasCapacityViolation && <li>Revisa las advertencias de capacidad física en cada unidad.</li>}
                         </ul>
                       </div>
                     )}
@@ -1050,7 +1053,7 @@ export default function BookingWidget() {
                   <div className="absolute bottom-4 left-5 text-white">
                     <h3 className="text-xl font-bold">Resumen de tu reserva</h3>
                     <p className="text-white/70 text-sm">
-                      {cart.length} {categoria === 'Pasadía' ? 'unidad/es' : 'habitación/es'} · {categoria === 'Pasadía' ? 'Pasadía por el día' : `${noches} noche${noches > 1 ? 's' : ''}`}
+                      {cart.length} {categoria === 'Pasadía' ? (cart.length === 1 ? 'unidad' : 'unidades') : (cart.length === 1 ? 'habitación' : 'habitaciones')} · {categoria === 'Pasadía' ? 'Pasadía por el día' : `${noches} noche${noches > 1 ? 's' : ''}`}
                     </p>
                   </div>
                 </div>
@@ -1150,7 +1153,7 @@ export default function BookingWidget() {
                         {/* Subtotal & Taxes Section */}
                         <div className="mt-2 pt-2 border-t border-gray-200/60 space-y-1 text-gray-500 font-medium">
                           <div className="flex justify-between text-[11px]">
-                            <span>Subtotal Habitación</span>
+                            <span>{categoria === 'Pasadía' ? 'Subtotal unidad' : 'Subtotal Habitación'}</span>
                             <span>${item.subtotal.toFixed(2)}</span>
                           </div>
                           <div className="flex justify-between text-[11px]">
@@ -1383,7 +1386,7 @@ export default function BookingWidget() {
                           {/* Subtotal & Taxes Section */}
                           <div className="mt-2 pt-2 border-t border-gray-200/60 space-y-1 text-gray-500 font-medium">
                             <div className="flex justify-between text-[11px]">
-                              <span>Subtotal Habitación</span>
+                              <span>{categoria === 'Pasadía' ? 'Subtotal unidad' : 'Subtotal Habitación'}</span>
                               <span>${item.subtotal.toFixed(2)}</span>
                             </div>
                             <div className="flex justify-between text-[11px]">
