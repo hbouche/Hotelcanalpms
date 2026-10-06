@@ -60,6 +60,7 @@ app.use('/api/v1/api-keys', apiRouter);
 app.use('/api/v1/webhooks', webRouter);
 app.use('/api/v1/admin', adminRouter);
 app.use('/api/v1/public', publicRouter);
+app.use('/api/v1/demo', require('./routes/demo'));
 app.use('/api/v1/public/integrations', integrationsRouter);
 app.use('/api/v1/crm', crmRouter);
 app.use('/api/v1', hotelRouter); // serves /hotel/* and /reportes/*

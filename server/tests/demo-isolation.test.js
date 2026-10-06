@@ -1,0 +1,56 @@
+'use strict';
+const { test } = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const { randomUUID } = require('node:crypto');
+const root=fs.mkdtempSync(path.join(os.tmpdir(),'hotel-demo-isolation-'));
+process.env.DATA_DIR=root;
+const { openDemo }=require('../demo-store');
+const day=n=>new Date(Date.now()+n*86400000).toISOString().slice(0,10);
+test('separate seed, backup, persistence, idempotency, capacity and cancellation',async()=>{
+  const hotel=path.join(root,'hotel-canal.db');fs.writeFileSync(hotel,'OPERATIONAL SENTINEL: no DEMO writes');const before=fs.readFileSync(hotel);
+  const filename=path.join(root,'independent','demo.db');let s=openDemo(filename);
+  const count=t=>s.db.prepare(`SELECT COUNT(*) AS n FROM ${t}`).get().n;
+  assert.equal(count('demo_rooms'),20);assert.equal(count('demo_products'),3);assert.equal(count('demo_bookings'),6);assert.equal(count('demo_credits'),3);
+  assert.deepEqual(s.products.map(p=>p.cents),[10000,10000,3850]);
+  await s.db.backup(path.join(root,'before-demo-tests.sqlite'));
+  const recovered=new (require('better-sqlite3'))(path.join(root,'before-demo-tests.sqlite'),{readonly:true});
+  assert.equal(recovered.pragma('integrity_check',{simple:true}),'ok');
+  assert.equal(recovered.prepare('SELECT COUNT(*) AS n FROM demo_bookings').get().n,6);recovered.close();
+  const body={product_id:'demo-room-a',arrival:day(40),departure:day(42),people:2,request_id:randomUUID()};
+  const first=s.reserve(body);assert.equal(first.cents,20000);assert.equal(s.reserve(body).id,first.id);assert.equal(count('demo_bookings'),7);
+  assert.throws(()=>s.reserve({...body,people:1}),/otros datos/);
+  s.db.close();s=openDemo(filename);assert.equal(count('demo_bookings'),7);assert.equal(count('demo_credits'),3);assert.equal(s.reserve(body).id,first.id);
+  for(let i=0;i<9;i++)s.reserve({...body,request_id:randomUUID()});
+  assert.throws(()=>s.reserve({...body,request_id:randomUUID()}),/disponibilidad/);
+  s.db.prepare("UPDATE demo_bookings SET state='Cancelada DEMO' WHERE id=?").run(first.id);
+  s.reserve({...body,request_id:randomUUID()});
+  const pass={product_id:'demo-daypass',arrival:day(50),departure:day(50),people:3,request_id:randomUUID()};
+  assert.equal(s.reserve(pass).cents,11550);s.reserve({...pass,request_id:randomUUID()});assert.throws(()=>s.reserve({...pass,people:1,request_id:randomUUID()}),/disponibilidad/);
+  assert.throws(()=>s.reserve({...pass,departure:day(51),request_id:randomUUID()}),/fechas/);
+  assert.throws(()=>s.reserve({...body,people:3,request_id:randomUUID()}),/personas/);
+  const existing=s.db.prepare('SELECT COUNT(*) AS n FROM demo_bookings WHERE seeded=0').get().n;
+  s.db.transaction(()=>{for(let i=existing;i<500;i++)s.db.prepare("INSERT INTO demo_bookings (id,request_id,product_id,arrival,departure,people,cents,state) VALUES (?,?,'demo-room-a',?,?,1,10000,'Cancelada DEMO')").run('DEMO-'+randomUUID(),randomUUID(),day(100),day(101));})();
+  assert.throws(()=>s.reserve({...body,arrival:day(110),departure:day(111),request_id:randomUUID()}),/Límite/);
+  assert.equal(s.db.pragma('integrity_check',{simple:true}),'ok');assert.deepEqual(s.db.pragma('foreign_key_check'),[]);assert.deepEqual(fs.readFileSync(hotel),before);
+  assert(!s.db.prepare("SELECT name FROM sqlite_master WHERE name IN ('habitaciones','reservas_hotel','folio_hotel','usuarios')").get());
+  s.db.close();
+});
+test('public DEMO routes reject personal fields, preserve retries, persist and cancel',async()=>{
+  const express=require('express'),app=express();app.use(express.json());app.use('/demo',require('../routes/demo'));const server=app.listen(0,'127.0.0.1');
+  await new Promise(r=>server.once('listening',r));const base='http://127.0.0.1:'+server.address().port+'/demo';
+  const call=async(p,method='GET',body)=>{const r=await fetch(base+p,{method,headers:{'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined});return {status:r.status,data:await r.json()};};
+  try{
+    assert.equal((await call('/catalog')).data.data.products.length,3);
+    const body={product_id:'demo-room-b',arrival:day(60),departure:day(61),people:4,request_id:randomUUID()};
+    assert.equal((await call('/reservations','POST',{...body,email:'synthetic@example.invalid'})).status,400);
+    const a=await call('/reservations','POST',body),b=await call('/reservations','POST',body);assert.equal(a.status,201);assert.equal(a.data.data.id,b.data.data.id);
+    assert.equal((await call('/reservations/'+a.data.data.id)).data.data.cents,10000);
+    assert.equal((await call('/reservations/'+a.data.data.id,'DELETE')).data.data.state,'Cancelada DEMO');
+    assert.equal((await call('/reservations/'+a.data.data.id,'DELETE')).data.data.state,'Cancelada DEMO');
+    assert.equal((await call('/reservations/demo-seed-001','DELETE')).status,404);
+    assert.equal((await call('/reservations/'+a.data.data.id)).data.data.state,'Cancelada DEMO');
+  }finally{await new Promise(r=>server.close(r));}
+});

@@ -1,50 +1,19 @@
-import { useState } from 'react';
-
-const API = '/api/v1/public';
-type AvailableType = { tipo: string; disponibles: number; capacidad_max: number };
-
-// Public GETs only. No token, customer fields, uploads, payments or mutation endpoint.
-export default function BookingDemo() {
-  const today = new Date().toISOString().slice(0, 10);
-  const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
-  const [arrival, setArrival] = useState(today);
-  const [departure, setDeparture] = useState(tomorrow);
-  const [category, setCategory] = useState('Estadía');
-  const [status, setStatus] = useState('Elige las fechas para probar la conexión pública con el PMS.');
-  const [types, setTypes] = useState<AvailableType[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [connected, setConnected] = useState(false);
-  const [simulated, setSimulated] = useState(false);
-  const [paid, setPaid] = useState(false);
-  async function check() {
-    if (!arrival || !departure || (category === 'Pasadía' ? departure < arrival : departure <= arrival)) {
-      setStatus('Revisa las fechas: el alojamiento requiere al menos una noche. El pasadía permite entrada y salida el mismo día.'); return;
-    }
-    setLoading(true); setConnected(false); setTypes([]); setSimulated(false); setPaid(false);
-    try {
-      const params = new URLSearchParams({ check_in: arrival, check_out: departure, categoria: category });
-      const response = await fetch(`${API}/disponibilidad?${params}`, { credentials: 'omit' });
-      const payload = await response.json();
-      if (!response.ok || !payload.success || !Array.isArray(payload.data?.tipos_disponibles)) throw new Error();
-      setTypes(payload.data.tipos_disponibles); setConnected(true);
-      setStatus(payload.data.tipos_disponibles.length ? 'Conexión verificada: respuesta de la consulta pública del PMS.' : 'Conexión verificada. El PMS no devuelve categorías disponibles para estas fechas.');
-    } catch { setStatus('No se pudo completar la consulta pública. Prueba otra vez; el escenario ficticio sigue disponible.'); }
-    finally { setLoading(false); }
-  }
-  return <div className="min-h-screen bg-stone-50 text-stone-800">
-    <div className="bg-emerald-950 text-white text-center p-3 text-sm">DEMO · SOLO LECTURA · Sin reservas, archivos ni pagos reales</div>
-    <header className="max-w-5xl mx-auto px-5 py-6 flex flex-wrap justify-between gap-4"><strong>HOTEL PANAMA CANAL<small className="block font-normal tracking-widest">CONVENTION CENTER · COLÓN</small></strong><a className="underline" href="https://wa.me/50769900199" target="_blank" rel="noopener noreferrer">Consulta comercial por WhatsApp ↗</a></header>
-    <main className="max-w-5xl mx-auto p-5 pb-16"><p className="text-sm tracking-widest text-emerald-800">WEBSITE + PMS EXISTENTE</p><h1 className="font-serif text-4xl md:text-6xl mt-3 mb-6">Prueba la experiencia<br />de consulta.</h1><p className="max-w-2xl text-lg">Consulta la disponibilidad publicada por el PMS y explora un escenario ficticio de recepción. Esta prueba no modifica el inventario ni registra huéspedes.</p>
-      <section className="bg-white rounded-2xl border p-6 mt-8"><h2 className="font-serif text-2xl">1. Consulta conectada</h2><p className="text-sm mt-2">Respuesta actual de la API pública. La cantidad devuelta no confirma el inventario comercial ni asegura una reserva.</p>
-        <form onSubmit={e => { e.preventDefault(); check(); }} className="grid md:grid-cols-4 gap-4 mt-6">
-          <label>Experiencia<select className="block border rounded p-3 w-full" value={category} onChange={e => {setCategory(e.target.value);setConnected(false);setTypes([]); if(e.target.value==='Pasadía') setDeparture(arrival);}}><option>Estadía</option><option>Pasadía</option></select></label>
-          <label>Entrada<input className="block border rounded p-3 w-full" type="date" required min={today} value={arrival} onChange={e => {setArrival(e.target.value);setConnected(false);setTypes([]);if(category==='Pasadía')setDeparture(e.target.value);}} /></label>
-          <label>Salida<input className="block border rounded p-3 w-full" type="date" required min={arrival} value={departure} onChange={e => {setDeparture(e.target.value);setConnected(false);setTypes([]);}} /></label>
-          <button className="bg-emerald-900 text-white rounded p-3 self-end disabled:opacity-50" disabled={loading}>{loading ? 'Consultando…' : 'Consultar PMS'}</button>
-        </form><p role="status" className="p-4 bg-stone-100 mt-5 rounded">{connected ? '✓ ' : ''}{status}</p>
-        <div className="grid sm:grid-cols-3 gap-4 mt-4">{types.map(t => <article key={t.tipo} className="border rounded p-4"><h3 className="font-semibold">{t.tipo}</h3><p>{t.disponibles} disponibles en la respuesta</p><p className="text-sm">Capacidad máxima publicada: {t.capacidad_max}</p></article>)}</div>
-      </section>
-      <section className="bg-emerald-950 text-white rounded-2xl p-6 mt-6"><h2 className="font-serif text-2xl">2. Escenario de recepción ficticio</h2><p className="mt-3">DEMO-001 · Huésped ficticio · Clásica DEMO · 2 adultos · 1 noche</p><p>Ejemplo: USD 45 por adulto × 2 = USD 90. Sin impuesto de ejemplo. No es tarifa comercial.</p><div className="flex flex-wrap gap-3 mt-5"><button className="border rounded p-3 disabled:opacity-50" onClick={()=>setSimulated(true)} disabled={simulated}>{simulated?'Check-in simulado ✓':'Simular check-in'}</button><button className="border rounded p-3 disabled:opacity-50" onClick={()=>setPaid(true)} disabled={paid}>{paid?'Abono simulado ✓':'Simular abono manual de USD 30'}</button><button className="border rounded p-3" onClick={()=>{setSimulated(false);setPaid(false);}}>Reiniciar escenario</button></div><p aria-live="polite" className="mt-4">Estado: {simulated?'Hospedado ficticio':'Confirmada ficticia'} · Saldo simulado: USD {paid?'60':'90'}.</p><p className="text-sm mt-4 text-emerald-100">Estos botones solo cambian la memoria de esta página. Recargar reinicia el ejemplo. No se envían datos al servidor.</p></section>
-      <p className="text-sm mt-6">No se solicitan datos personales. Para una cotización comercial usa el contacto del hotel. El enlace website → PMS permite esta consulta; no constituye sincronización del inventario.</p>
-    </main></div>;
+import { useEffect, useRef, useState } from 'react';
+type Product={id:string;name:string;kind:string;cents:number;capacity:number;units:number};
+type Booking={id:string;arrival:string;departure:string;people:number;cents:number;state:string};
+const API='/api/v1/demo',money=(c:number)=>new Intl.NumberFormat('es-PA',{style:'currency',currency:'USD'}).format(c/100);
+export default function BookingDemo(){
+ const today=new Date().toISOString().slice(0,10);
+ const [products,setProducts]=useState<Product[]>([]),[pid,setPid]=useState(new URLSearchParams(location.search).get('product')||'demo-room-a');
+ const [arrival,setArrival]=useState(today),[departure,setDeparture]=useState(new Date(Date.now()+86400000).toISOString().slice(0,10));
+ const [people,setPeople]=useState(2),[busy,setBusy]=useState(false),[status,setStatus]=useState('Cargando catálogo DEMO…'),[booking,setBooking]=useState<Booking|null>(null);
+ const request=useRef({signature:'',id:''}),p=products.find(p=>p.id===pid);
+ async function api(path:string,options:RequestInit={}){const r=await fetch(API+path,{...options,credentials:'omit',headers:{'Content-Type':'application/json'}});const d=await r.json();if(!r.ok||!d.success)throw Error(d.error?.message||'Error de conexión DEMO');return d.data;}
+ useEffect(()=>{let active=true;api('/catalog').then(d=>{if(active){setProducts(d.products);setStatus('Catálogo DEMO conectado: 20 habitaciones ficticias, dos tipos y pasadía.');}}).catch(e=>active&&setStatus(e.message));const saved=localStorage.getItem('hotel-demo-reservation-v2');if(saved)api('/reservations/'+encodeURIComponent(saved)).then(d=>active&&setBooking(d)).catch(()=>{});return()=>{active=false;};},[]);
+ useEffect(()=>{if(p?.kind==='day')setDeparture(arrival);},[p?.kind,arrival]);
+ async function reserve(e:React.FormEvent){e.preventDefault();setBusy(true);const body={product_id:pid,arrival,departure:p?.kind==='day'?arrival:departure,people};const signature=JSON.stringify(body);if(request.current.signature!==signature)request.current={signature,id:crypto.randomUUID()};try{const d=await api('/reservations',{method:'POST',body:JSON.stringify({...body,request_id:request.current.id})});setBooking(d);localStorage.setItem('hotel-demo-reservation-v2',d.id);setStatus('Reserva DEMO persistente guardada. Puedes recargar y verificarla.');}catch(e){setStatus((e as Error).message);}finally{setBusy(false);}}
+ async function refresh(cancel=false){if(!booking)return;setBusy(true);try{setBooking(await api('/reservations/'+encodeURIComponent(booking.id),cancel?{method:'DELETE'}:{}));setStatus(cancel?'Reserva DEMO cancelada; inventario de prueba liberado.':'Reserva recuperada desde el servidor.');}catch(e){setStatus((e as Error).message);}finally{setBusy(false);}}
+ const nights=Math.max(0,(Date.parse(departure)-Date.parse(arrival))/86400000),total=p?p.cents*(p.kind==='day'?people:nights):0;
+ const input='block border rounded p-3 w-full',button='border rounded p-3 disabled:opacity-50';
+ return <div className="min-h-screen bg-stone-50 text-stone-800"><div className="bg-emerald-950 text-white text-center p-3 text-sm">DEMO · Reservas persistentes de prueba · Sin cobros ni mensajes</div><header className="max-w-5xl mx-auto px-5 py-6"><strong>HOTEL PANAMA CANAL<small className="block font-normal tracking-widest">CONVENTION CENTER · COLÓN</small></strong></header><main className="max-w-5xl mx-auto p-5 pb-16"><h1 className="font-serif text-4xl md:text-6xl mb-6">Reserva una experiencia<br/>de prueba.</h1><p className="text-lg">Dos tipos de habitación a USD 100 por habitación y noche, y oferta de pasadía a USD 38.50 por persona. Precios ficticios DEMO, sin vigencia comercial.</p><div className="grid md:grid-cols-3 gap-4 mt-7">{products.map(x=><article key={x.id} className="bg-white border rounded-xl p-5"><p>PRODUCTO DEMO</p><h2 className="font-serif text-2xl mt-2">{x.name}</h2><p className="text-xl mt-3">{money(x.cents)} <small>{x.kind==='day'?'persona / día':'habitación / noche'}</small></p><p className="text-sm mt-2">Capacidad ilustrativa: {x.capacity}. Instalaciones e inclusiones por confirmar.</p><button className="underline mt-4" onClick={()=>{setPid(x.id);setPeople(Math.min(people,x.capacity));}}>Elegir producto</button></article>)}</div><section className="bg-white rounded-2xl border p-6 mt-8"><h2 className="font-serif text-2xl">Tu reserva DEMO</h2><p className="text-sm mt-2">Solo producto, fechas y cantidad de personas. No introduzcas datos personales.</p><form onSubmit={reserve} className="grid md:grid-cols-4 gap-4 mt-6"><label>Producto<select className={input} value={pid} onChange={e=>{setPid(e.target.value);setPeople(1);}}>{products.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label><label>Entrada<input className={input} type="date" required min={today} value={arrival} onChange={e=>setArrival(e.target.value)}/></label><label>{p?.kind==='day'?'Día de visita':'Salida'}<input className={input} type="date" required disabled={p?.kind==='day'} min={arrival} value={p?.kind==='day'?arrival:departure} onChange={e=>setDeparture(e.target.value)}/></label><label>Personas<input className={input} type="number" required min={1} max={p?.capacity||1} value={people} onChange={e=>setPeople(Number(e.target.value))}/></label><div className="md:col-span-4 flex flex-wrap items-center gap-4"><button className="bg-emerald-900 text-white rounded p-3 disabled:opacity-50" disabled={busy||!p}>{busy?'Procesando…':'Guardar reserva DEMO'}</button><p>Subtotal de prueba: <strong>{money(total)}</strong></p></div></form><p role="status" className="p-4 bg-stone-100 mt-5 rounded">{status}</p><p className="text-sm mt-3">Impuestos, horarios e inclusiones comerciales sin confirmar. No se solicita ni procesa un pago.</p></section>{booking&&<section className="bg-emerald-950 text-white rounded-2xl p-6 mt-6"><h2 className="font-serif text-2xl">Reserva persistente DEMO</h2><p className="break-all mt-3">Referencia: {booking.id}</p><p>{booking.arrival} → {booking.departure} · {booking.people} personas · {money(booking.cents)}</p><p className="mt-3">Estado: <strong>{booking.state}</strong></p><div className="flex flex-wrap gap-3 mt-5"><button className={button} disabled={busy} onClick={()=>refresh()}>Verificar en servidor</button><button className={button} disabled={busy||booking.state==='Cancelada DEMO'} onClick={()=>refresh(true)}>Cancelar reserva DEMO</button></div><p className="text-sm mt-4">Almacenamiento DEMO separado. Recargar conserva la referencia en este navegador.</p></section>}<p className="text-sm mt-6">Unidades, capacidades, seis reservas iniciales y tres créditos ficticios. Esta prueba no confirma una estadía del hotel ni envía comunicaciones.</p></main></div>;
 }
