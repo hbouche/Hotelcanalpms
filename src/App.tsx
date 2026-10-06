@@ -14,6 +14,7 @@ import Saldos from './pages/Saldos';
 import Productos from './pages/Productos';
 import Reportes from './pages/Reportes';
 import BookingWidget from './pages/BookingWidget';
+import BookingDemo from './pages/BookingDemo';
 import ImportarDatos from './pages/ImportarDatos';
 import Huespedes from './pages/Huespedes';
 import Aprobaciones from './pages/Aprobaciones';
@@ -29,8 +30,10 @@ function App() {
   const [pendingCount, setPendingCount] = useState(0);
   const navigate = useNavigate();
   const location = useLocation();
+  const publicBooking = location.pathname === '/reservar';
 
   useEffect(() => {
+    if (publicBooking) { setLoading(false); return; }
     if (isLoggedIn()) {
       api.get('/auth/me').then(r => {
         localStorage.setItem('pms_user', JSON.stringify(r.data));
@@ -43,11 +46,11 @@ function App() {
           setLoading(false);
         });
     } else { setLoading(false); }
-  }, []);
+  }, [publicBooking]);
 
   // Fetch pending count periodically
   useEffect(() => {
-    if (user && ['admin', 'receptionist'].includes(user.rol)) {
+    if (!publicBooking && user && ['admin', 'receptionist'].includes(user.rol)) {
       const fetchPending = () => {
         api.get('/hotel/reservas?estado=Pendiente')
           .then(r => {
@@ -61,7 +64,7 @@ function App() {
       const interval = setInterval(fetchPending, 30000);
       return () => clearInterval(interval);
     }
-  }, [user]);
+  }, [user, publicBooking]);
 
   const handleLogin = async (email: string, password: string) => {
     const r = await api.post('/auth/login', { email, password });
@@ -78,7 +81,7 @@ function App() {
   };
 
   // Public route: /reservar (no auth needed)
-  if (location.pathname === '/reservar') return <BookingWidget />;
+  if (location.pathname === '/reservar') return new URLSearchParams(location.search).get('demo') === '1' ? <BookingDemo /> : <BookingWidget />;
 
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-gray-50"><div className="animate-pulse text-xl text-gray-400">Cargando...</div></div>;
   if (!user) return <Login onLogin={handleLogin} />;
