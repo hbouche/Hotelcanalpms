@@ -339,7 +339,7 @@ export default function NuevaReserva() {
     selectedGroupRooms,
     roomConfigs,
     form.plan_codigo,
-  form.adultos,
+    form.adultos,
     form.menores,
     form.mascotas,
     form.check_in,

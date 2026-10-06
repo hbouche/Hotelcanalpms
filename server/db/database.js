@@ -61,7 +61,7 @@ function getDb() {
       }
     }
 
-    const notifExists = db.prepare("SELECTname FROM sqlite_master WHERE type='table' AND name='notificaciones_log'").get();
+    const notifExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='notificaciones_log'").get();
     if (notifExists) {
       const notifCols = db.prepare('PRAGMA table_info(notificaciones_log)').all().map(c => c.name);
       if (!notifCols.includes('contenido')) {

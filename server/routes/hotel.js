@@ -298,7 +298,7 @@ router.get('/hotel/reservas', requireAuth, requireOperations, (req, res) => {
     const conditions = [];
     const params = [];
     if (estado) { conditions.push('estado = ?'); params.push(estado); }
-    if(tipo_habitacion) { conditions.push('tipo_habitacion = ?'); params.push(tipo_habitacion); }
+    if (tipo_habitacion) { conditions.push('tipo_habitacion = ?'); params.push(tipo_habitacion); }
     if (cliente) { conditions.push('(cliente LIKE ? OR apellido LIKE ?)'); params.push(`%${cliente}%`, `%${cliente}%`); }
     if (check_in_desde) { conditions.push('check_in >= ?'); params.push(check_in_desde); }
     if (check_in_hasta) { conditions.push('check_in <= ?'); params.push(check_in_hasta); }
@@ -1277,7 +1277,7 @@ router.post('/hotel/reservas/:id/folio/:folioId/reversar', requireAuth, requireO
       if (original.tipo === 'credito') {
         // Reversión de pago -> Genera un débito
         concept = `Reversión de pago [ID ${original.id}]: ${original.concepto}`;
-     db.prepare('INSERT INTO folio_hotel (reserva_id, tipo, concepto, monto, registrado_por) VALUES (?, ?, ?, ?, ?)').run(
+        db.prepare('INSERT INTO folio_hotel (reserva_id, tipo, concepto, monto, registrado_por) VALUES (?, ?, ?, ?, ?)').run(
           req.params.id, 'debito', concept, original.monto, req.user.nombre
         );
 
