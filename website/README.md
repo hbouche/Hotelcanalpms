@@ -19,10 +19,19 @@ pending verification; personal emails are excluded.
 ## Proposed Render static configuration
 
 - Existing repository `hbouche/Hotelcanalpms`, main.
-- Build command: `node website/build.mjs`
-- Publish directory: `website`
-- Environment: `SKIP_INSTALL_DEPS=true`
+- Build command: `node website/render-build.mjs`
+- Publish directory: `website/site`
+- Environment: `SKIP_INSTALL_DEPS=true`, explicit `SITE_MODE=withdrawn` or `full`
 - Auto deploy: off. No paid compute or disk for the static site.
+
+Create the tiny `withdrawn` artifact first and retain its deploy ID. Publish
+`full`, exercise withdrawal, and restore `full`. The withdrawn artifact has
+only a small index/404 page and excludes images, JS and PMS links. A Dashboard
+rollback can reuse it without a rebuild while its artifact remains retained.
+The approved demo bandwidth budget is USD 5/month, with preventive withdrawal
+at USD 1 attributable to the demo or an unexplained surge. This is a soft
+budget: metering delay and small HTTP/error responses can still incur charges.
+Never claim a hard or zero-risk cap. Monitor only bandwidth for budget control.
 
 Do not create/deploy until workspace spending conditions are verified. Static
 hosting has no base fee, but public outbound overages cost USD 0.15/GB and
